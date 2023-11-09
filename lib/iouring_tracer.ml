@@ -9,7 +9,7 @@ let runner bpf_prog ?log_file (f : program) =
   match Bpftrace_progs.read bpf_prog with
   | None -> failwith "Program not found"
   | Some prog -> (
-      let log = Option.value ~default:"log" log_file in
+      let log = Option.value ~default:"trace.txt" log_file in
       let cmd = "bpftrace -e" ^ Filename.quote_command prog [] ~stdout:log in
       let pid = fork () in
       match pid with
