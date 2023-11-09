@@ -1,0 +1,21 @@
+BEGIN {
+    time("[%H:%M:%S]: ");
+    printf("Tracing IO_uring...\n");
+}
+
+
+tracepoint:io_uring:*
+{
+    @reads[probe] = count();
+    time("[%H:%M:%S]: ");
+    printf("[%d]: %s %s\n", pid, probe, comm);
+}
+
+/* kprobe:io_uring_setup */
+/* { */
+/*      printf("hello, io_uring being set up here\n") */
+/* } */
+
+/* END { */
+/*     print(@) */
+/* } */

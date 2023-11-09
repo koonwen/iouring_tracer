@@ -1,0 +1,3 @@
+(executables
+ (names eio_tracepoints eio_kprobes eio_sleep)
+ (libraries eio_linux eio iouring_tracer))

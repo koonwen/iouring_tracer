@@ -1,0 +1,5 @@
+(executable
+ (public_name iou)
+ (name iou)
+ (modules iou)
+ (libraries cmdliner iouring_tracer))

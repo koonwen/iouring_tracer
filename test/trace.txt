@@ -1,0 +1,18 @@
+Attaching 18 probes...
+[22:04:19]: Tracing IO_uring...
+[22:04:20]: [532102]: tracepoint:io_uring:io_uring_create eio_sleep.exe
+[22:04:20]: [532102]: tracepoint:io_uring:io_uring_register eio_sleep.exe
+[22:04:20]: [532102]: tracepoint:io_uring:io_uring_register eio_sleep.exe
+[22:04:20]: [532102]: tracepoint:io_uring:io_uring_submit_req eio_sleep.exe
+[22:04:20]: [532102]: tracepoint:io_uring:io_uring_file_get eio_sleep.exe
+[22:04:20]: [532102]: tracepoint:io_uring:io_uring_poll_arm eio_sleep.exe
+[22:04:20]: [532102]: tracepoint:io_uring:io_uring_cqring_wait eio_sleep.exe
+[22:04:22]: [532102]: tracepoint:io_uring:io_uring_cqring_wait eio_sleep.exe
+
+
+@reads[tracepoint:io_uring:io_uring_create]: 1
+@reads[tracepoint:io_uring:io_uring_file_get]: 1
+@reads[tracepoint:io_uring:io_uring_submit_req]: 1
+@reads[tracepoint:io_uring:io_uring_poll_arm]: 1
+@reads[tracepoint:io_uring:io_uring_cqring_wait]: 2
+@reads[tracepoint:io_uring:io_uring_register]: 2

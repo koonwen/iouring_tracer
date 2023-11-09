@@ -1,0 +1,9 @@
+(library
+ (name iouring_tracer)
+ (libraries unix))
+
+(rule
+ (target bpftrace_progs.ml)
+ (deps (source_tree bpftrace_progs))
+ (action (with-stdout-to %{target}
+          (run ocaml-crunch -m plain bpftrace_progs))))
