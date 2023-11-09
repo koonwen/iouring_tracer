@@ -8,9 +8,10 @@ depends: [
   "ocaml"
   "dune" {>= "3.11"}
   "crunch"
-  "eio"
+  "eio_linux"
   "odoc" {with-doc}
 ]
+depexts: [["bpftrace"] {os = "linux"}]
 build: [
   ["dune" "subst"] {dev}
   [

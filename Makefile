@@ -10,4 +10,4 @@ test_k:
 	sudo _build/default/test/eio_kprobes.exe
 
 switch:
-	opam switch create .
+	opam switch create . -y
