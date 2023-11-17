@@ -1,7 +1,7 @@
 # iouring_tracer
-High-level tracing tool for Linux IO-uring based on eBPF technology
-and leveraging [`bpftrace`](https://github.com/iovisor/bpftrace) to
-output a trace log.
+Tracing tool for Linux IO-uring leveraging
+[`bpftrace`](https://github.com/iovisor/bpftrace) to generate a trace
+log.
 
 # Features
 - [ ] `iou` binary that runs loads the tracer and spawns the target

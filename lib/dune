@@ -1,6 +1,6 @@
 (library
  (name iouring_tracer)
- (libraries unix))
+ (libraries unix logs))
 
 (rule
  (target bpftrace_progs.ml)
