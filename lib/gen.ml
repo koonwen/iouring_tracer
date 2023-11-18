@@ -46,9 +46,14 @@ rawtracepoint:io_uring_task_add
 rawtracepoint:io_uring_task_work_run
 *)
 
-module Builtins = struct
-  let time () = "time('[%H:%M:%S]: ');"
-  let printf = Printf.sprintf
+module Builtins : sig
+  type t = string
+  val time : t
+  val printf: string -> t
+end = struct
+  type t = string
+  let time = "time('[%H:%M:%S]: ')"
+  let printf = Printf.sprintf "printf('%s')"
 end
 
 module Kprobes = struct
@@ -77,8 +82,7 @@ module Kprobes = struct
      kprobe:io_uring_unreg_ringfd
      kprobe:io_uring_validate_mmap_request.isra.
   *)
-  let io_uring_setup f =
-    Builtins.(f printf)
+  (* let io_uring_setup f = Builtins.(f printf) *)
 end
 
 module Tracepoints = struct
@@ -102,10 +106,24 @@ module Tracepoints = struct
   *)
 end
 
-let entry =
-  "BEGIN {\n\ttime('[%H:%M:%S]: ');\n\tprintf('Tracing IO_uring kprobes...\\n');\n}"
+open Format
 
-let gen = Out_channel.with_open_bin "bpfgen.bt" (fun oc ->
-    let fmt = Format.formatter_of_out_channel oc in
-    Format.fprintf fmt "@[%s@]@." entry
-  )
+let pp_fun ~fun_name ~lines =
+  let pp_line ppf = fprintf ppf "\t%s;" in
+  asprintf "%s {@,%a@,}@." fun_name
+    (pp_print_list ~pp_sep:pp_print_newline pp_line)
+    lines
+
+let pp_program ppf ~fun_list =
+  let pp_sep ppf () = fprintf ppf "\n\n" in
+  fprintf ppf "@[<v>%a@]@." (pp_print_list ~pp_sep pp_print_string) fun_list
+
+let entry text =
+  let lines =
+    Builtins.[time; printf text] in
+  pp_fun ~fun_name:"BEGIN" ~lines
+
+let gen =
+  Out_channel.with_open_bin "bpfgen.bt" (fun oc ->
+      let ppf = formatter_of_out_channel oc in
+      pp_program ppf ~fun_list:[ entry "Tracing IO_uring kprobes...\n" ])

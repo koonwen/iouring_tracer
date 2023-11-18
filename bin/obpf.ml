@@ -1,7 +1,7 @@
 (* Entry point *)
 let iou trace_file f =
   let bpftrace_prog = "tracepoints.bt" in
-  Iouring_tracer.Driver.(runner ~log_file:trace_file bpftrace_prog (Binary f))
+  Obpftrace.Driver.(runner ~log_file:trace_file bpftrace_prog (Binary f))
 
 open Cmdliner
 

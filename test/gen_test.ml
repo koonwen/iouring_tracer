@@ -1,1 +1,1 @@
-let () = Iouring_tracer.Gen.gen
+let () = Obpftrace.Gen.gen

@@ -7,4 +7,4 @@ let main () =
     Eio.Time.sleep (Eio.Stdenv.clock env) 2.0
   done
 
-let () = Iouring_tracer.Driver.kprobes main
+let () = Obpftrace.Driver.kprobes main

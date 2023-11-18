@@ -1,9 +1,9 @@
-IOU=_build/default/bin/iou.exe
+OBPF=_build/default/bin/obpf.exe
 SLEEPER=_build/default/test/eio_sleep.exe
 
 iou:
 	dune build
-	sudo $(IOU) $(SLEEPER)
+	sudo $(OBPF) $(SLEEPER)
 
 test_k:
 	dune build

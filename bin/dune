@@ -1,5 +1,4 @@
 (executable
- (public_name iou)
- (name iou)
- (modules iou)
- (libraries cmdliner iouring_tracer))
+ (public_name obpf)
+ (name obpf)
+ (libraries cmdliner obpftrace))
