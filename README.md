@@ -26,7 +26,7 @@ Or as a library
 
 ``` ocaml
 let main () = <program logic>
-let () = Obpftrace.Driver.tracepoints main
+let () = Obpftrace.Driver.kprobes main
 ```
 You can find trace log in `trace.txt`
 
