@@ -3,12 +3,18 @@ Tracing tool for Linux IO-uring leveraging
 [`bpftrace`](https://github.com/iovisor/bpftrace) to generate a trace
 log.
 
+
+# TODO
+- [ ] Find io-uring programs that have contention
+- [ ] Attach probes trace data to `Runtime_events`
+- [ ] Write bpftrace programs that dump meaningful io-uring probe trace information
+- [ ] TBC: OCaml API's for writing and generating custom eBPF programs.
+
 # Features
 - [ ] `obpf` is a convenient executable that loads the tracer and
       spawns the target program program
 - [ ] `obpftrace` library for directly attaching the tracer to
       programs that can't be run through the binary.
-- [ ] TBC: OCaml API's for writing and generating custom eBPF programs.
 
 # Install
 ``` shell
