@@ -26,27 +26,6 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
-off_t get_file_size(int fd) {
-    struct stat st;
-
-    if(fstat(fd, &st) < 0) {
-        perror("fstat");
-        return -1;
-    }
-
-    if (S_ISBLK(st.st_mode)) {
-        unsigned long long bytes;
-        if (ioctl(fd, BLKGETSIZE64, &bytes) != 0) {
-            perror("ioctl");
-            return -1;
-        }
-        return bytes;
-    } else if (S_ISREG(st.st_mode))
-        return st.st_size;
-
-    return -1;
-}
-
 int seq_read(char *filename){
     int fd = open(filename, O_RDONLY);
     if (fd < 0){
