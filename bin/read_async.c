@@ -3,11 +3,19 @@
 #include <stdio.h>
 #include <liburing.h>
 #include "common.c"
+#include <fcntl.h>
+#include <string.h>
+#include <unistd.h>
+#include <assert.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
 
 #define QUEUE_DEPTH 10
 
 int prep_read_request(char filename[], int id, struct io_uring *ring);
 int get_completion(struct io_uring *ring);
+static int setup_context(unsigned queue_depth, struct io_uring *ring);
 
 struct file_info {
     char* filename;
@@ -16,17 +24,17 @@ struct file_info {
 };
 
 int main(int argc, char *argv[]){
+    /* Init io_uring */
+    struct io_uring ring;
+    // int ret;
+
     if (argc <= 1) {
         fprintf(stderr, "Usage: %s [filename] <[filename] ...>\n", argv[0]);
         return 1;
     };
-
-    /* Init io_uring */
-    struct io_uring ring;
-    int ret = io_uring_queue_init(QUEUE_DEPTH, &ring, 0);
-    if (ret != 0){
-        perror("io_uring_queue_init");
-        return 1;
+    
+    if(setup_context(QUEUE_DEPTH, &ring)) {
+      return 1;
     }
 
     /* Prepare read operations */
@@ -51,14 +59,30 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
+static int setup_context(unsigned queue_depth, struct io_uring *ring) {
+  int ret;
+  ret = io_uring_queue_init(queue_depth, ring, 0);
+  if(ret < 0) {
+    fprintf(stderr, "queue_init: %s\n", strerror(-ret));
+    return -1;
+  }
+
+  return 0;
+}
+
 int prep_read_request(char *filename, int id, struct io_uring *ring){
+    off_t sz;
     int fd = open(filename, O_RDONLY);
     if (fd < 0){
         perror("open");
         return 1;
     };
-    off_t sz = get_file_size(fd);
+    if(get_file_size(fd, &sz)) {
+      return 1;
+    }
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
+    assert(sqe);
+
     struct file_info* fi = malloc(sizeof(struct file_info));
     fi->filename = filename;
     fi->id = id;
