@@ -45,9 +45,9 @@ int main(int argc, char *argv[]) {
       return 1;
     }
   };
-  io_uring_submit(&ring);
   /* Would expect out of order return when reading a small file but
-     that doensn't happen */
+   that doensn't happen */
+  io_uring_submit(&ring);
 
   for (int i = 1; i < argc; i++) {
     int ret = get_completion(&ring);

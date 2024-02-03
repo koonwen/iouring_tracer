@@ -1,21 +1,39 @@
+// from bin/read_async.c:
+struct file_info {
+    char* filename;
+    char* data;
+    int id;
+};
+
 BEGIN {
     time("[%H:%M:%S]: ");
     printf("Tracing IO_uring...\n");
 }
 
 
-tracepoint:io_uring:*
-{
+tracepoint:io_uring:* {
     @reads[probe] = count();
     time("[%H:%M:%S]: ");
     printf("[%d]: %s %s\n", pid, probe, comm);
 }
 
-/* kprobe:io_uring_setup */
-/* { */
-/*      printf("hello, io_uring being set up here\n") */
+kprobe:io_uring*
+{
+    @reads[probe] = count();
+    time("[%H:%M:%S]: ");
+    printf("%s %s\n", probe, comm);
+}
+
+
+/* tracepoint:io_uring:io_uring_complete { */
+/*    time("[%H:%M:%S]: "); */
+/*    printf("[%d]: %s %s\n", pid, probe, comm); */
+/*    $fi = uptr((struct file_info*) args->user_data); */
+/*    printf("result = %d", args->res); */
+/*    printf("Pointer 0x%llx ", args->user_data); */
+/*    printf("File = %s, id = %d\n", str($fi->filename), $fi->id); */
 /* } */
 
-/* END { */
-/*     print(@) */
-/* } */
+kprobe:io_uring_release {
+    exit()
+}

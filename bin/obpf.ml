@@ -7,11 +7,11 @@ open Cmdliner
 
 let log_file =
   let doc = "write trace log to FILE" in
-  Arg.(value & opt file "trace.txt" & info [ "-l" ] ~docv:"FILE" ~doc)
+  Arg.(value & opt file "trace.txt" & info [ "l" ] ~docv:"FILE" ~doc)
 
 let bpftrace_prog =
   let doc = "path to bpftrace program" in
-  Arg.(value & opt file "kprobes.bt" & info [ "-p" ] ~docv:"FILE" ~doc)
+  Arg.(value & opt file "tracepoints.bt" & info [ "p" ] ~docv:"FILE" ~doc)
 
 let program =
   let doc = "program to execute" in
