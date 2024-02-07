@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 /* Parallel word count */
 #include "common.c"
 #include <assert.h>
@@ -45,8 +47,6 @@ int main(int argc, char *argv[]) {
       return 1;
     }
   };
-  /* Would expect out of order return when reading a small file but
-   that doensn't happen */
   io_uring_submit(&ring);
 
   for (int i = 1; i < argc; i++) {
@@ -73,7 +73,7 @@ static int setup_context(unsigned queue_depth, struct io_uring *ring) {
 
 int prep_read_request(char *filename, int id, struct io_uring *ring) {
   off_t sz;
-  int fd = open(filename, O_RDONLY);
+  int fd = open(filename, O_DIRECT);
   if (fd < 0) {
     perror("open");
     return 1;
