@@ -10,20 +10,18 @@ BEGIN {
     printf("Tracing IO_uring...\n");
 }
 
-
 tracepoint:io_uring:* {
     @reads[probe] = count();
     time("[%H:%M:%S]: ");
     printf("[%d]: %s %s\n", pid, probe, comm);
 }
 
-kprobe:io_uring*
-{
-    @reads[probe] = count();
-    time("[%H:%M:%S]: ");
-    printf("%s %s\n", probe, comm);
-}
-
+/* kprobe:io_uring* */
+/* { */
+/*     @reads[probe] = count(); */
+/*     time("[%H:%M:%S]: "); */
+/*     printf("%s %s\n", probe, comm); */
+/* } */
 
 /* tracepoint:io_uring:io_uring_complete { */
 /*    time("[%H:%M:%S]: "); */
