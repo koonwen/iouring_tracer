@@ -15,3 +15,4 @@ test_t:
 
 switch:
 	opam switch create . -y
+	opam install . --depext-only

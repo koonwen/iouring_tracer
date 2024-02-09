@@ -4,9 +4,10 @@ open Cmdliner
 (* Entry point *)
 let obpf_gen () = ()
 
-let obpf_trace input trace_file bin =
+let obpf_trace input trace_file log_level bin =
+  Fmt_tty.setup_std_outputs ();
   Logs.set_reporter (Logs_fmt.reporter ());
-  Logs.set_level (Some Logs.Debug);
+  Logs.set_level log_level;
   Driver.(runner ~log_file:trace_file ~input (Binary bin))
 
 let gen_cmd =
@@ -26,7 +27,10 @@ let trace_cmd =
             else Stdlib.Result.ok (Bpftrace.Inline s)),
           Bpftrace.pp_arg )
     in
-    let doc = "path to bpftrace program" in
+    let doc =
+      "path to bpftrace program. If absent, default io_uring tracepoints are \
+       loaded"
+    in
     Arg.(value & opt bpf_conv Bpftrace.Default & info [ "p" ] ~docv:"FILE" ~doc)
   in
   let program =
@@ -36,7 +40,8 @@ let trace_cmd =
   let doc = "Program tracer tool using bpftrace" in
   let man = [ `S Manpage.s_description ] in
   let info = Cmd.info "trace" ~version:"%%VERSION%%" ~doc ~man in
-  Cmd.v info Term.(const obpf_trace $ input $ log_file $ program)
+  Cmd.v info
+    Term.(const obpf_trace $ input $ log_file $ Logs_cli.level () $ program)
 
 let obpf =
   let doc = Cmd.info "obpf" in

@@ -13,16 +13,14 @@ BEGIN {
 tracepoint:io_uring:* {
     @reads[probe] = count();
     time("[%H:%M:%S]: ");
-    printf("[%d]: %s %s\n", pid, probe, comm);
+    printf("(%s) %s\n", comm, probe);
 }
 
-/* kprobe:io_uring* */
-/* { */
-/*     @reads[probe] = count(); */
-/*     time("[%H:%M:%S]: "); */
-/*     printf("%s %s\n", probe, comm); */
-/* } */
-
+tracepoint:syscalls:*io_uring* {
+    @reads[probe] = count();
+    time("[%H:%M:%S]: ");
+    printf("(%s) %s\n", comm, probe);
+}
 /* tracepoint:io_uring:io_uring_complete { */
 /*    time("[%H:%M:%S]: "); */
 /*    printf("[%d]: %s %s\n", pid, probe, comm); */
@@ -32,6 +30,7 @@ tracepoint:io_uring:* {
 /*    printf("File = %s, id = %d\n", str($fi->filename), $fi->id); */
 /* } */
 
-kprobe:io_uring_release {
-    exit()
+kprobe:io_uring_unreg_ringfd
+{
+    printf("Tearing down io_uring\n");
 }

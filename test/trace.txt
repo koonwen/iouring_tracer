@@ -1,0 +1,25 @@
+Attaching 25 probes...
+[14:45:27]: Tracing IO_uring...
+[14:45:27]: (test_read_async) tracepoint:syscalls:sys_enter_io_uring_setup
+[14:45:27]: (test_read_async) tracepoint:io_uring:io_uring_create
+[14:45:27]: (test_read_async) tracepoint:syscalls:sys_exit_io_uring_setup
+[14:45:28]: (test_read_async) tracepoint:syscalls:sys_enter_io_uring_enter
+[14:45:28]: (test_read_async) tracepoint:io_uring:io_uring_submit_sqe
+[14:45:28]: (test_read_async) tracepoint:io_uring:io_uring_file_get
+[14:45:28]: (test_read_async) tracepoint:io_uring:io_uring_submit_sqe
+[14:45:28]: (test_read_async) tracepoint:io_uring:io_uring_file_get
+[14:45:28]: (test_read_async) tracepoint:io_uring:io_uring_submit_sqe
+[14:45:28]: (test_read_async) tracepoint:io_uring:io_uring_file_get
+[14:45:28]: (test_read_async) tracepoint:io_uring:io_uring_complete
+[14:45:28]: (test_read_async) tracepoint:io_uring:io_uring_complete
+[14:45:28]: (test_read_async) tracepoint:io_uring:io_uring_complete
+[14:45:28]: (test_read_async) tracepoint:syscalls:sys_exit_io_uring_enter
+Tearing down io_uring
+@reads[tracepoint:syscalls:sys_enter_io_uring_setup]: 1
+@reads[tracepoint:io_uring:io_uring_create]: 1
+@reads[tracepoint:syscalls:sys_exit_io_uring_setup]: 1
+@reads[tracepoint:syscalls:sys_exit_io_uring_enter]: 1
+@reads[tracepoint:syscalls:sys_enter_io_uring_enter]: 1
+@reads[tracepoint:io_uring:io_uring_complete]: 3
+@reads[tracepoint:io_uring:io_uring_submit_sqe]: 3
+@reads[tracepoint:io_uring:io_uring_file_get]: 3
