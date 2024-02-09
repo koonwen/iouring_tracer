@@ -49,13 +49,13 @@ end = struct
   and arg = File of string | Inline of string
   [@@deriving show { with_path = false }]
 
-  let stringify_arg = function File f -> f | Inline p -> "-e " ^ p
+  let stringify_arg = function File f -> f | Inline p -> "-e" ^ p
   let stringify_mode mode = "-B" ^ String.lowercase_ascii (show_mode mode)
 
   let stringify_format format =
     "-f" ^ String.lowercase_ascii (show_format format)
 
-  let stringify_output output = "-o " ^ output
+  let stringify_output output = "-o" ^ output
 
   let stringify_proc_management = function
     | PID i -> "-p " ^ Int.to_string i
@@ -92,14 +92,15 @@ end = struct
 
   let%expect_test "default" =
     make (File "default_test.bt") |> quote_cmd |> print_string;
-    [%expect {| 'bpftrace' 'default_test.bt' '-o trace.txt' |}]
+    [%expect {| 'bpftrace' 'default_test.bt' '-otrace.txt' |}]
 
   let%expect_test "loaded" =
     make ~mode:Line ~format:Json ~proc_management:(PID 0)
       ~flags:[ No_warnings; Unsafe; K; KK; Debug; Debug_verbose ]
       (Inline "loaded_test.bt")
     |> quote_cmd |> print_string;
-    [%expect {| 'bpftrace' '-e loaded_test.bt' '-Bline' '-fjson' '-o trace.txt' '-p 0' '--no-warnings' 'unsafe' '-k' '-kk' '-d' '-dd' |}]
+    [%expect
+      {| 'bpftrace' '-eloaded_test.bt' '-Bline' '-fjson' '-otrace.txt' '-p 0' '--no-warnings' 'unsafe' '-k' '-kk' '-d' '-dd' |}]
 
   let exec t =
     let cmd_s = quote_cmd t in
@@ -120,32 +121,26 @@ let runner ~bpf_prog ?log_file (f : 'a program) =
   match prog_op with
   | None -> failwith "Bpftrace program not found"
   | Some prog -> (
-      match fork () with
-      (* Child *)
-      | 0 -> (
-          let log = Option.value ~default:"trace.txt" log_file in
+      match f with
+      | Binary bin ->
           let cmd =
-            "bpftrace -e" ^ Filename.quote_command prog [] ~stdout:log
+            Bpftrace.make ?output:log_file ~proc_management:(Command bin)
+              (Inline prog)
           in
-          match system cmd with
-          | WEXITED e | WSIGNALED e | WSTOPPED e -> _exit e)
-      (* Parent *)
-      | child ->
-          Unix.sleepf 1.;
-          at_exit (fun () -> kill child Sys.sigint);
-          (* Need to figure out how to run this in a less privileged environment *)
-          (match f with
-          | Function f -> (
-              try f ()
-              with _ ->
-                Printf.printf "Something went wrong with traced program%!")
-          | Binary bin -> system bin |> ignore);
-          (* This isn't the behaviour we want, should kill child when
-             traced program ends or error occurs, adding `kill child
-             sigint` exhibits funny behaviour by orphaning the child
-             likely because of the _exit e. Manual cancellation is the
-             current way to stop all processes *)
-          wait () |> ignore)
+          Bpftrace.exec cmd |> ignore
+      | Function f -> (
+          match fork () with
+          (* Child *)
+          | 0 -> f ()
+          (* Parent *)
+          | child -> (
+              let cmd =
+                Bpftrace.make ?output:log_file ~proc_management:(PID child)
+                  (Inline prog)
+              in
+              match Bpftrace.exec cmd with
+              | WEXITED _e | WSIGNALED _e | WSTOPPED _e -> kill child Sys.sigint)))
+
 
 let tracepoints f = runner ~bpf_prog:"tracepoints.bt" (Function f)
 let kprobes f = runner ~bpf_prog:"kprobes.bt" (Function f)
