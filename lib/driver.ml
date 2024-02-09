@@ -139,8 +139,8 @@ let runner ~bpf_prog ?log_file (f : 'a program) =
                   (Inline prog)
               in
               match Bpftrace.exec cmd with
-              | WEXITED _e | WSIGNALED _e | WSTOPPED _e -> kill child Sys.sigint)))
-
+              | WEXITED _e | WSIGNALED _e | WSTOPPED _e -> kill child Sys.sigint
+              )))
 
 let tracepoints f = runner ~bpf_prog:"tracepoints.bt" (Function f)
 let kprobes f = runner ~bpf_prog:"kprobes.bt" (Function f)
