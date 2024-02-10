@@ -1,5 +1,5 @@
 type t
-type arg = File of string | Inline of string
+type arg = File of string | Inline of string | Default
 type mode = Line | Full
 type format = Json | Text
 type proc_management = PID of int | Command of string

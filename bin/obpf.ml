@@ -14,7 +14,6 @@ let gen_cmd =
   Cmd.v info Term.(const obpf_gen $ const ())
 
 let trace_cmd =
-
   let log_file =
     let doc = "write trace log to FILE" in
     Arg.(value & opt file "trace.txt" & info [ "l" ] ~docv:"FILE" ~doc)
@@ -28,10 +27,7 @@ let trace_cmd =
           Bpftrace.pp_arg )
     in
     let doc = "path to bpftrace program" in
-    Arg.(
-      value
-      & opt bpf_conv (Bpftrace.File "tracepoints.bt")
-      & info [ "p" ] ~docv:"FILE" ~doc)
+    Arg.(value & opt bpf_conv Bpftrace.Default & info [ "p" ] ~docv:"FILE" ~doc)
   in
   let program =
     let doc = "program to trace" in
