@@ -1,4 +1,5 @@
 [@@@warning "-32"]
+
 let src = Logs.Src.create "bpftrace" ~doc:"Internal OCaml bindings for bpftrace"
 
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -20,10 +21,23 @@ and format = Json | Text
 and proc_management = PID of int | Command of string
 and flag = No_warnings | Unsafe | K | KK | Debug | Debug_verbose
 
-and arg = File of string | Inline of string
+and arg = File of string | Inline of string | Default
 [@@deriving show { with_path = false }]
 
-let stringify_arg = function File f -> f | Inline p -> "-e" ^ p
+let read_file filename =
+  match Bpftrace_default.read filename with
+  | None ->
+      let msg = Printf.sprintf "File %s not found" filename in
+      failwith msg
+  | Some file -> file
+
+let tracepoints = read_file "tracepoints.bt"
+
+let stringify_arg = function
+  | File f -> f
+  | Inline p -> "-e" ^ p
+  | Default -> "-e" ^ tracepoints
+
 let stringify_mode mode = "-B" ^ String.lowercase_ascii (show_mode mode)
 let stringify_format format = "-f" ^ String.lowercase_ascii (show_format format)
 let stringify_output output = "-o" ^ output
@@ -60,8 +74,46 @@ let quote_cmd { mode; format; output; proc_management; flags; arg } =
   Filename.quote_command "bpftrace" ((arg' :: optionals) @ flags')
 
 let%expect_test "default" =
-  make (File "default_test.bt") |> quote_cmd |> print_string;
-  [%expect {| 'bpftrace' 'default_test.bt' '-otrace.txt' |}]
+  make Default |> quote_cmd |> print_string;
+  [%expect {|
+    'bpftrace' '-e// from bin/read_async.c:
+    struct file_info {
+        char* filename;
+        char* data;
+        int id;
+    };
+
+    BEGIN {
+        time("[%H:%M:%S]: ");
+        printf("Tracing IO_uring...\n");
+    }
+
+    tracepoint:io_uring:* {
+        @reads[probe] = count();
+        time("[%H:%M:%S]: ");
+        printf("[%d]: %s %s\n", pid, probe, comm);
+    }
+
+    /* kprobe:io_uring* */
+    /* { */
+    /*     @reads[probe] = count(); */
+    /*     time("[%H:%M:%S]: "); */
+    /*     printf("%s %s\n", probe, comm); */
+    /* } */
+
+    /* tracepoint:io_uring:io_uring_complete { */
+    /*    time("[%H:%M:%S]: "); */
+    /*    printf("[%d]: %s %s\n", pid, probe, comm); */
+    /*    $fi = uptr((struct file_info*) args->user_data); */
+    /*    printf("result = %d", args->res); */
+    /*    printf("Pointer 0x%llx ", args->user_data); */
+    /*    printf("File = %s, id = %d\n", str($fi->filename), $fi->id); */
+    /* } */
+
+    kprobe:io_uring_release {
+        exit()
+    }
+    ' '-otrace.txt' |}]
 
 let%expect_test "loaded" =
   make ~mode:Line ~format:Json ~proc_management:(PID 0)
