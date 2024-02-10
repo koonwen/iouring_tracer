@@ -1,4 +1,4 @@
 (executable
  (public_name obpf)
  (name obpf)
- (libraries cmdliner obpftrace))
+ (libraries cmdliner obpftrace logs logs.fmt))
