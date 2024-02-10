@@ -3,14 +3,16 @@
  (inline_tests)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.make ppx_expect))
- (libraries unix str logs)
- (modules_without_implementation driver_bak))
+ (libraries unix str logs))
 
-(rule
- (target bpftrace_progs.ml)
- (deps
-  (source_tree bpftrace_progs))
- (action
-  (with-stdout-to
-   %{target}
-   (run ocaml-crunch -m plain bpftrace_progs))))
+(copy_files
+ (files bpftrace_progs/*))
+
+; (rule
+;  (target bpftrace_progs.ml)
+;  (deps
+;   (source_tree bpftrace_progs))
+;  (action
+;   (with-stdout-to
+;    %{target}
+;    (run ocaml-crunch -m plain bpftrace_progs))))
