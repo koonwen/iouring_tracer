@@ -27,3 +27,7 @@ setup.log
 
 # Local OPAM switch
 _opam/
+
+# generated files
+*.txt
+*.bin

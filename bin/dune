@@ -3,7 +3,3 @@
  (name obpf)
  (libraries cmdliner obpftrace logs logs.fmt logs.cli fmt.tty)
  (modules obpf))
-
-(executable
- (name hello)
- (modules hello))

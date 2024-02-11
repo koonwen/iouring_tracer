@@ -1,6 +1,7 @@
 let src = Logs.Src.create "test logs" ~doc:"logging for test suites"
 
 module Log = (val Logs.src_log src : Logs.LOG)
+
 let () =
   Fmt_tty.setup_std_outputs ();
   Logs.set_reporter (Logs_fmt.reporter ());
@@ -16,7 +17,8 @@ let ring_ctx_manager ?polling_timeout ~queue_depth f =
 let read_async (files : string list) =
   ring_ctx_manager ~queue_depth:(List.length files) (fun ring ->
       let bufs =
-        List.mapi (fun i file ->
+        List.mapi
+          (fun i file ->
             let fd = Unix.(openfile file [ O_RDONLY ] 0o666) in
             let fstat = Unix.fstat fd in
             let buf = Cstruct.create fstat.st_size in
@@ -25,10 +27,9 @@ let read_async (files : string list) =
               Uring.read ring ~file_offset:Optint.Int63.zero fd buf (i, file)
             with
             | None -> failwith "Uring.read failed"
-            | Some _ -> buf) files
+            | Some _ -> buf)
+          files
       in
-      (* Uring.read automatically submits tasks to the kernel to pick
-         up, We can't do buffered reads like in c_test/read_async.c *)
       Logs.debug (fun m -> m "%a" Uring.Stats.pp (Uring.get_debug_stats ring));
       List.iter
         (fun _ ->
