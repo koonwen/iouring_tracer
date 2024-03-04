@@ -25,7 +25,7 @@ and arg = File of string | Inline of string | Default
 [@@deriving show { with_path = false }]
 
 let read_file filename =
-  match Bpftrace_default.read filename with
+  match Tracepoints.read filename with
   | None ->
       let msg = Printf.sprintf "File %s not found" filename in
       failwith msg

@@ -3,13 +3,10 @@
  (inline_tests)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.make ppx_expect))
- (libraries unix str logs))
+ (libraries unix logs runtime_events tracing bpftrace)
+ (modules driver obpftrace))
 
-(rule
- (target bpftrace_default.ml)
- (deps
-  (source_tree bpftrace_default))
- (action
-  (with-stdout-to
-   %{target}
-   (run ocaml-crunch -m plain bpftrace_default))))
+(executable
+ (name runtime_events_hook)
+ (modules runtime_events_hook)
+ (libraries runtime_events unix))

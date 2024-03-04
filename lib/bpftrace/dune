@@ -1,0 +1,30 @@
+(library
+ (name bpftrace)
+ (libraries logs unix core)
+ (inline_tests)
+ (preprocess
+  (pps ppx_expect ppx_inline_test ppx_deriving.show))
+ (synopsis "Bpftrace bindings"))
+
+(menhir
+ (modules parser)
+ (explain true))
+
+(ocamllex lexer)
+
+(rule
+ (target tracepoints.ml)
+ (deps
+  (source_tree bt))
+ (action
+  (with-stdout-to
+   %{target}
+   (run ocaml-crunch -m plain bt))))
+
+(rule
+ (target types.txt)
+ (action
+  (with-stdout-to
+   %{target}
+   (bash
+    "sudo bpftrace -vl 'tracepoint:*io_uring*' | grep -E '^\\s{4}(\\S.*$)' | awk '{NF--; print}' | sort -f | uniq -i"))))

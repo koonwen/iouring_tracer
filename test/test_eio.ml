@@ -1,3 +1,4 @@
+[@@@warning "-32"]
 open Eio.Std
 
 let concurrent () =
@@ -28,3 +29,5 @@ let single_sleeper () =
 
 let double_sleeper () =
   Eio_linux.run @@ fun env -> Switch.run (fun sw -> sleeper ~env ~sw 2 3)
+
+let () = single_sleeper ()

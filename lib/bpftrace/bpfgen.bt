@@ -1,0 +1,5 @@
+BEGIN {
+	time('[%H:%M:%S]:');
+	printf('Tracing IO_uring ...');
+}
+

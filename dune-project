@@ -1,7 +1,8 @@
-(lang dune 3.11)
+(lang dune 3.13)
 (using dune_site 0.1)
 (name obpftrace)
 
+(using menhir 3.0)
 ;(generate_opam_files true)
 
 (source

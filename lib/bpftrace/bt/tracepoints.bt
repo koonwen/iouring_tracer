@@ -1,9 +1,9 @@
-// from bin/read_async.c:
-struct file_info {
-    char* filename;
-    char* data;
-    int id;
-};
+/* // from bin/read_async.c: */
+/* struct file_info { */
+/*     char* filename; */
+/*     char* data; */
+/*     int id; */
+/* }; */
 
 BEGIN {
     time("[%H:%M:%S]: ");
@@ -21,6 +21,25 @@ tracepoint:syscalls:*io_uring* {
     time("[%H:%M:%S]: ");
     printf("(%s) %s\n", comm, probe);
 }
+
+/* tracepoint:syscalls:sys_enter_io_uring_enter { */
+/*     @reads[probe] = count(); */
+/*     time("[%H:%M:%S]: "); */
+/*     $syscall_nr = args->__syscall_nr; */
+/*     $fd = args->fd; */
+/*     $to_submit = args->min_complete; */
+/*     printf("(%s) %s (%d, %d, %d,)\n", comm, probe, $syscall_nr, $fd, $to_submit); */
+/* } */
+
+/* tracepoint:syscalls:sys_enter_io_uring_enter */
+/* int __syscall_nr */
+/* unsigned int fd */
+/* u32 to_submit */
+/* u32 min_complete */
+/* u32 flags */
+/* const void * argp */
+/* size_t argsz */
+
 /* tracepoint:io_uring:io_uring_complete { */
 /*    time("[%H:%M:%S]: "); */
 /*    printf("[%d]: %s %s\n", pid, probe, comm); */
