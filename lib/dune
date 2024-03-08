@@ -3,10 +3,9 @@
  (inline_tests)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.make ppx_expect))
- (libraries unix logs runtime_events tracing bpftrace)
- (modules driver obpftrace))
+ (libraries unix logs runtime_events tracing bpftrace))
 
-(executable
- (name runtime_events_hook)
- (modules runtime_events_hook)
- (libraries runtime_events unix))
+; (executable
+;  (name runtime_events_hook)
+;  (modules runtime_events_hook)
+;  (libraries runtime_events unix))

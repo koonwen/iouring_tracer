@@ -64,24 +64,25 @@ let make ?mode ?format ?(output = "trace.txt") ?proc_management ?(flags = [])
 let quote_cmd { mode; format; output; proc_management; flags; arg } =
   let mode' = Option.map stringify_mode mode in
   let format' = Option.map stringify_format format in
-  let output' = Option.map stringify_output output in
   let proc_management' = Option.map stringify_proc_management proc_management in
-  let optionals =
-    List.filter_map Fun.id [ mode'; format'; output'; proc_management' ]
-  in
+  let optionals = List.filter_map Fun.id [ mode'; format'; proc_management' ] in
   let flags' = stringify_flags flags in
+  (* Instead of using Bpftrace internal command to pipe output, we will
+       hand pipe it so that the it is unbuffered and we can thread the
+       events closer to realtime into the custom_events *)
   let arg' = stringify_arg arg in
-  Filename.quote_command "bpftrace" ((arg' :: optionals) @ flags')
+  Filename.quote_command ?stdout:output "bpftrace" ((arg' :: optionals) @ flags')
 
 let%expect_test "default" =
   make Default |> quote_cmd |> print_string;
-  [%expect {|
-    'bpftrace' '-e// from bin/read_async.c:
-    struct file_info {
-        char* filename;
-        char* data;
-        int id;
-    };
+  [%expect
+    {|
+    'bpftrace' '-e/* // from bin/read_async.c: */
+    /* struct file_info { */
+    /*     char* filename; */
+    /*     char* data; */
+    /*     int id; */
+    /* }; */
 
     BEGIN {
         time("[%H:%M:%S]: ");
@@ -91,15 +92,32 @@ let%expect_test "default" =
     tracepoint:io_uring:* {
         @reads[probe] = count();
         time("[%H:%M:%S]: ");
-        printf("[%d]: %s %s\n", pid, probe, comm);
+        printf("(%s) %s\n", comm, probe);
     }
 
-    /* kprobe:io_uring* */
-    /* { */
+    tracepoint:syscalls:*io_uring* {
+        @reads[probe] = count();
+        time("[%H:%M:%S]: ");
+        printf("(%s) %s\n", comm, probe);
+    }
+
+    /* tracepoint:syscalls:sys_enter_io_uring_enter { */
     /*     @reads[probe] = count(); */
     /*     time("[%H:%M:%S]: "); */
-    /*     printf("%s %s\n", probe, comm); */
+    /*     $syscall_nr = args->__syscall_nr; */
+    /*     $fd = args->fd; */
+    /*     $to_submit = args->min_complete; */
+    /*     printf("(%s) %s (%d, %d, %d,)\n", comm, probe, $syscall_nr, $fd, $to_submit); */
     /* } */
+
+    /* tracepoint:syscalls:sys_enter_io_uring_enter */
+    /* int __syscall_nr */
+    /* unsigned int fd */
+    /* u32 to_submit */
+    /* u32 min_complete */
+    /* u32 flags */
+    /* const void * argp */
+    /* size_t argsz */
 
     /* tracepoint:io_uring:io_uring_complete { */
     /*    time("[%H:%M:%S]: "); */
@@ -110,10 +128,11 @@ let%expect_test "default" =
     /*    printf("File = %s, id = %d\n", str($fi->filename), $fi->id); */
     /* } */
 
-    kprobe:io_uring_release {
-        exit()
+    kprobe:io_uring_unreg_ringfd
+    {
+        printf("Tearing down io_uring\n");
     }
-    ' '-otrace.txt' |}]
+    ' >'trace.txt' |}]
 
 let%expect_test "loaded" =
   make ~mode:Line ~format:Json ~proc_management:(PID 0)
@@ -121,7 +140,7 @@ let%expect_test "loaded" =
     (Inline "loaded_test.bt")
   |> quote_cmd |> print_string;
   [%expect
-    {| 'bpftrace' '-eloaded_test.bt' '-Bline' '-fjson' '-otrace.txt' '-p0' '--no-warnings' 'unsafe' '-k' '-kk' '-d' '-dd' |}]
+    {| 'bpftrace' '-eloaded_test.bt' '-Bline' '-fjson' '-p0' '--no-warnings' 'unsafe' '-k' '-kk' '-d' '-dd' >'trace.txt' |}]
 
 let exec t =
   let cmd_s = quote_cmd t in
