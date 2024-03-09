@@ -1,6 +1,7 @@
 %token <string> ID
 %token NEWLINE
-%token INDENT
+(* %token INDENT *)
+%token ARG
 %token LEFT_BRACK
 %token RIGHT_BRACK
 %token COLON
@@ -28,6 +29,10 @@
 %token UINT16
 %token UINT32
 %token UINT64
+%token DATA_LOC
+
+%left UNSIGNED
+%right NEWLINE
 
 %start <Gen.Intermediate.t> parse
 %%
@@ -35,17 +40,30 @@
 parse: l = list(spec); EOF { l }
 
 spec:
-  probe=ID; COLON; domain=ID; COLON; name=ID; arg_list = list(arg); NEWLINE
-  { Gen.Intermediate.{probe=probe; domain=domain; name=name; args = arg_list} };
+probe=ID; COLON; domain=ID; COLON; name=ID; arg_list = list(arg);
+NEWLINE { Gen.Intermediate.{probe=probe; domain=domain; name=name; args = arg_list} };
 
 arg:
-| NEWLINE; INDENT; t = read_t; name = ID { (t, name) } ;
+| ARG; t = read_t; name = ID { (t, name) } ;
 
   read_t:
-| STRUCT; name = ID; _t = read_t            { Gen.Intermediate.Struct (name, [])}
 | t_ = read_t; STAR                         { Gen.Intermediate.Ptr (t_) }
 | t_ = read_t; LEFT_BRACK; RIGHT_BRACK      { Gen.Intermediate.Array (t_) }
+| UNSIGNED                                  { Gen.Intermediate.(Unsigned Int) }
+| UNSIGNED; t_ = unsigned_t                 { t_ }
+| CONST; t_ = read_t                        { t_ }
+| DATA_LOC; t_ = read_t                   { t_ }
 | t_ = t                                    { t_ };
+
+  unsigned_t:
+| INT     {Gen.Intermediate.(Unsigned Int)}
+| INT8    {Gen.Intermediate.(Unsigned Int8)}
+| INT16   {Gen.Intermediate.(Unsigned Int16)}
+| INT32   {Gen.Intermediate.(Unsigned Int32)}
+| INT64   {Gen.Intermediate.(Unsigned Int64)}
+| SIZE_T  {Gen.Intermediate.(Unsigned Int64)}
+| LONG    {Gen.Intermediate.(Unsigned Long)}
+| LONGLONG {Gen.Intermediate.(Unsigned LongLong)}
 
 t:
   | VOID    {Gen.Intermediate.(Void)}
@@ -64,3 +82,4 @@ t:
   | UINT16  {Gen.Intermediate.(Unsigned (Int16))}
   | UINT32  {Gen.Intermediate.(Unsigned (Int32))}
   | UINT64  {Gen.Intermediate.(Unsigned (Int64))}
+  | STRUCT; name = ID {Gen.Intermediate.Struct (name, [])}

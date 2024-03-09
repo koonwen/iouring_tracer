@@ -8,13 +8,15 @@ let white = [ ' ' ] +
 let newline = '\r' | '\n' | "\r\n"
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 let indent = "    " | '\t'
+let arg = newline indent
 
 rule read =
-  parse
+parse
+  | arg         { Lexing.new_line lexbuf; ARG }
   | white       { read lexbuf }
   | newline     { Lexing.new_line lexbuf; NEWLINE }
-  | indent      { INDENT }
 
+  | "__data_loc"       { DATA_LOC }
   | "struct"           { STRUCT }
   | "const"            { CONST }
   | "void"             { VOID }

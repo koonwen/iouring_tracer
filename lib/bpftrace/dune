@@ -4,7 +4,13 @@
  (inline_tests)
  (preprocess
   (pps ppx_expect ppx_inline_test ppx_deriving.show))
- (synopsis "Bpftrace bindings"))
+ (synopsis "Bpftrace bindings")
+ (modules bpftrace tracepoints))
+
+(library
+ (name test)
+ (libraries core)
+ (modules test lexer parser gen))
 
 (menhir
  (modules parser)

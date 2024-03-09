@@ -1,0 +1,7 @@
+(rule
+ (target tracepoints_spec.txt)
+ (action
+  (with-stdout-to
+    %{target}
+   (bash
+     "sudo bpftrace -vl 'tracepoint:*io_uring*'"))))
