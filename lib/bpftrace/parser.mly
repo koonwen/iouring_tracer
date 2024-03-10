@@ -52,7 +52,7 @@ arg:
 | UNSIGNED                                  { Gen.Intermediate.(Unsigned Int) }
 | UNSIGNED; t_ = unsigned_t                 { t_ }
 | CONST; t_ = read_t                        { t_ }
-| DATA_LOC; t_ = read_t                   { t_ }
+| DATA_LOC; t_ = read_t                     { t_ }
 | t_ = t                                    { t_ };
 
   unsigned_t:

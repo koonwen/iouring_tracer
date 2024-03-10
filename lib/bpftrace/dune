@@ -7,10 +7,10 @@
  (synopsis "Bpftrace bindings")
  (modules bpftrace tracepoints))
 
-(library
+(executable
  (name test)
  (libraries core)
- (modules test lexer parser gen))
+ (modules test lexer parser gen intermediate))
 
 (menhir
  (modules parser)

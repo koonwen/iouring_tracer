@@ -1,5 +1,5 @@
 (rule
- (target tracepoints_spec.txt)
+ (target tracepoints.spec)
  (action
   (with-stdout-to
     %{target}

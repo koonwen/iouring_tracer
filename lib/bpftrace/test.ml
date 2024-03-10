@@ -1,3 +1,4 @@
+[@@@warning "-32"]
 open Core
 open Lexing
 
@@ -35,3 +36,10 @@ let parse filename =
 let print filename =
   let t = parse filename in
   Gen.Intermediate.write_program t
+
+let () =
+  let f_path =
+    try (Sys.get_argv ()).(1)
+    with _ -> failwith "Need to supply file path as argument"
+  in
+  print f_path

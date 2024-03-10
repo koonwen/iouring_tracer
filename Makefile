@@ -6,8 +6,14 @@ build:
 	eval $(opam env)
 	$(SUDO) dune build
 
-test_obpf:
+gen: build
+	$(SUDO) dune exec -- ./lib/bpftrace/test.exe _build/default/lib/bpftrace/bt/tracepoints.spec
+
+test_trace:
 	$(SUDO) dune exec -- obpf trace $(PROG_BINARY)
+
+clean:
+	$(SUDO) dune clean
 
 switch:
 	opam switch create . -y

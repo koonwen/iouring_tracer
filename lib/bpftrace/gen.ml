@@ -74,10 +74,20 @@ module Intermediate = struct
   let transpile_function { name; args; _ } =
     pp_fun ~name ~lines:[ Builtins.time; transpile_printf_args args ]
 
-  let write_program intermediate =
-    List.iter
-      (fun i -> Printf.printf "%s\n" (transpile_function i))
-      intermediate
+  let handleable imd =
+    let can_handle spec =
+      let handleable_args =
+        List.filter
+          (fun (t, _) -> match t with Struct _ -> false | _ -> true)
+          spec.args
+      in
+      { spec with args = handleable_args }
+    in
+    List.map can_handle imd
+
+  let write_program (imd:t) =
+    let handleable = handleable imd in
+    List.iter (fun i -> Printf.printf "%s\n" (transpile_function i)) handleable
 end
 
 module Kprobes = struct
@@ -181,7 +191,7 @@ tracepoint:syscalls:sys_exit_io_uring_setup
     pp_fun ~name ~lines
 end
 
-let gen =
+let gen () =
   Out_channel.with_open_bin "bpfgen.bt" (fun oc ->
       let ppf = formatter_of_out_channel oc in
       pp_program ppf ~fun_list:[ entry "Tracing IO_uring ..." ])
