@@ -8,12 +8,18 @@ build:
 
 gen: build
 	$(SUDO) dune exec -- ./lib/bpftrace/test.exe _build/default/lib/bpftrace/bt/tracepoints.spec
+	cat bpfgen.bt
+
+gen1: build
+	$(SUDO) dune exec -- ./lib/bpftrace/test.exe _build/default/lib/bpftrace/bt/syscalls_only.spec
+	cat bpfgen.bt
 
 test_trace:
 	$(SUDO) dune exec -- obpf trace $(PROG_BINARY)
 
 clean:
 	$(SUDO) dune clean
+	rm bpfgen.bt trace.t
 
 switch:
 	opam switch create . -y

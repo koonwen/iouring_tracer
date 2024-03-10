@@ -2,6 +2,12 @@
  (target tracepoints.spec)
  (action
   (with-stdout-to
-    %{target}
-   (bash
-     "sudo bpftrace -vl 'tracepoint:*io_uring*'"))))
+   %{target}
+   (bash "sudo bpftrace -vl 'tracepoint:*io_uring*'"))))
+
+(rule
+ (target syscalls_only.spec)
+ (action
+  (with-stdout-to
+   %{target}
+   (bash "sudo bpftrace -vl 'tracepoint:syscalls:*io_uring*'"))))

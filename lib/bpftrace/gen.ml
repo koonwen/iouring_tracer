@@ -4,12 +4,19 @@ module Builtins : sig
   type t = string
 
   val time : t
-  val printf : string -> t
+  val printf : string -> string list -> t
 end = struct
   type t = string
 
-  let time = "time('[%H:%M:%S]:')"
-  let printf = Printf.sprintf "printf('%s')"
+  let time = "time(\"[%H:%M:%S]\")"
+
+  let printf fmt args =
+    let open Format in
+    match args with
+    | [] -> sprintf "printf(\"%s\")" fmt
+    | l ->
+        let args = String.concat ", " l in
+        sprintf "printf(\"%s\", %s)" fmt args
 end
 
 open Format
@@ -25,7 +32,7 @@ let pp_program ppf ~fun_list =
   fprintf ppf "@[<v>%a@]@." (pp_print_list ~pp_sep pp_print_string) fun_list
 
 let entry text =
-  let lines = Builtins.[ time; printf text ] in
+  let lines = Builtins.[ time; printf text [] ] in
   pp_fun ~name:"BEGIN" ~lines
 
 [@@@warning "-39"]
@@ -51,28 +58,30 @@ module Intermediate = struct
 
   let rec fmt_spec type' =
     let fmt_int_spec = function
-      | Int | Int8 | Int16 -> "d"
-      | Int32 | Int64 | Long | Size_t -> "l"
-      | LongLong -> "ll"
+      | Signed Int | Signed Int8 | Signed Int16 -> "%d"
+      | Unsigned Int | Unsigned Int8 | Unsigned Int16 -> "%u"
+      | Signed Int32 | Signed Int64 | Signed Long | Signed Size_t -> "%ld"
+      | Unsigned Int32 | Unsigned Int64 | Unsigned Long | Unsigned Size_t ->
+          "%lu"
+      | Signed LongLong -> "%lld"
+      | Unsigned LongLong -> "%llu"
+      | _ -> failwith "Not passed an int type"
     in
     match type' with
     | Bool -> "%b"
     | Char -> "%c"
-    | Unsigned i -> "%u" ^ fmt_int_spec i
-    | Signed i -> "%" ^ fmt_int_spec i
+    | (Unsigned _ | Signed _) as t -> fmt_int_spec t
     | Struct (_, _) -> failwith "Not implemented"
     | Void | Ptr _ | Array _ -> "0x%llx"
 
-  let transpile_printf_args args =
-    let types =
-      String.concat ", " ((List.map (fun (type', _) -> fmt_spec type')) args)
+  let transpile_function { probe; domain; name; args } =
+    let fullname = sprintf "%s:%s:%s" probe domain name in
+    let fmt_types =
+      List.map (fun (ty, _) -> fmt_spec ty) args |> String.concat ", "
     in
-    let args = String.concat ", " (List.map snd args) in
-    let s = Format.sprintf "\"%s\", %s;" types args in
-    Builtins.printf s
-
-  let transpile_function { name; args; _ } =
-    pp_fun ~name ~lines:[ Builtins.time; transpile_printf_args args ]
+    let fmt = fmt_types ^ "\\n" in
+    let arg_names = List.map (fun (_, name) -> sprintf "args->%s" name) args in
+    pp_fun ~name:fullname ~lines:Builtins.[ time; printf fmt arg_names ]
 
   let handleable imd =
     let can_handle spec =
@@ -85,9 +94,16 @@ module Intermediate = struct
     in
     List.map can_handle imd
 
-  let write_program (imd:t) =
+  let transpile_program (imd : t) =
     let handleable = handleable imd in
-    List.iter (fun i -> Printf.printf "%s\n" (transpile_function i)) handleable
+    List.map transpile_function handleable
+
+  let write_program (imd : t) oc =
+    let ppf = Format.formatter_of_out_channel oc in
+    let handleable = handleable imd in
+    List.iter
+      (fun i -> Format.fprintf ppf "%s\n" (transpile_function i))
+      handleable
 end
 
 module Kprobes = struct
@@ -191,7 +207,10 @@ tracepoint:syscalls:sys_exit_io_uring_setup
     pp_fun ~name ~lines
 end
 
-let gen () =
+let gen imd =
   Out_channel.with_open_bin "bpfgen.bt" (fun oc ->
       let ppf = formatter_of_out_channel oc in
-      pp_program ppf ~fun_list:[ entry "Tracing IO_uring ..." ])
+      let fun_list =
+        entry "Tracing IO_uring ..." :: Intermediate.transpile_program imd
+      in
+      pp_program ppf ~fun_list)

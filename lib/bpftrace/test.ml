@@ -33,13 +33,10 @@ let parse filename =
       in
       output ())
 
-let print filename =
-  let t = parse filename in
-  Gen.Intermediate.write_program t
-
 let () =
   let f_path =
     try (Sys.get_argv ()).(1)
     with _ -> failwith "Need to supply file path as argument"
   in
-  print f_path
+  let t = parse f_path in
+  Gen.gen t
