@@ -8,15 +8,10 @@
  (modules bpftrace tracepoints))
 
 (executable
- (name test)
- (libraries core)
- (modules test lexer parser gen intermediate))
-
-(menhir
- (modules parser)
- (explain true))
-
-(ocamllex lexer)
+ (name gen)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.make))
+ (modules intermediate spec_reader gen))
 
 (rule
  (target tracepoints.ml)

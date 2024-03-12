@@ -1,60 +1,36 @@
-[@@@warning "-32"]
+[@@@warning "-26"]
 
 (* This should replace Gen.Intermediate *)
-type types =
+type ty =
   | Void
   | Bool
   | Char
-  | Ints of bool * ints (* Boolean determines if int is unsigned *)
-  | Struct of string * args
-  | Ptr of types
-  | Array of types
-
-and ints = Int | Int8 | Int16 | Int32 | Int64 | Long | LongLong | Size_t
+  | Int
+  | Int8
+  | Int16
+  | Int32
+  | Int64
+  | Long
+  | LongLong
+  | Size_t
+  | Struct of string
+  | Ptr of ty
+  | Array of ty
 [@@deriving show { with_path = false }]
 
-and args = (types * string) list
+type arg = { const : bool; unsigned : bool; ty : ty; identifier : string }
+[@@deriving show { with_path = false }, make]
 
-type spec = { probe : string; domain : string; name : string; args : args }
+type spec = { probe : string; domain : string; name : string; args : arg list }
+[@@deriving show { with_path = false }, make]
+
 type t = spec list
+[@@deriving show { with_path = false }]
 
-let fmt_spec type' =
-  let fmt_int_spec = function
-    | Int | Int8 | Int16 -> "d"
-    | Int32 | Int64 | Long | Size_t -> "l"
-    | LongLong -> "ll"
-  in
-  match type' with
-  | Bool -> "%b"
+let fmt_spec ({ unsigned; ty; _ } : arg) =
+  match ty with
   | Char -> "%c"
-  | Ints (unsigned, i) ->
-      if unsigned then "%u" ^ fmt_int_spec i else "%" ^ fmt_int_spec i
-  | Struct (_, _) -> failwith "Not implemented"
-  | Void | Ptr _ | Array _ -> "0x%llx"
-
-let transpile_printf_args args =
-  let types =
-    String.concat ", " ((List.map (fun (type', _) -> fmt_spec type')) args)
-  in
-  let args = String.concat ", " (List.map snd args) in
-  let s = Format.sprintf "\"%s\", %s;" types args in
-  Gen.Builtins.printf s
-
-let transpile_function { name; args; _ } =
-  Gen.pp_fun ~name ~lines:[ Gen.Builtins.time; transpile_printf_args args ]
-
-(* Stub just to work with what we know *)
-let handleable imd =
-  let can_handle spec =
-    let handleable_args =
-      List.filter
-        (fun (t, _) -> match t with Struct _ -> false | _ -> true)
-        spec.args
-    in
-    { spec with args = handleable_args }
-  in
-  List.map can_handle imd
-
-let write_program imd =
-  let handleable = handleable imd in
-  List.iter (fun i -> Printf.printf "%s\n" (transpile_function i)) handleable
+  | Bool | Int | Int8 | Int16 -> if unsigned then "%u" else "%d"
+  | Int32 | Int64 | Long | Size_t -> if unsigned then "%lu" else "%ld"
+  | LongLong -> if unsigned then "%llu" else "%lld"
+  | Void | Struct _ | Ptr _ | Array _ -> "0x%llx"
