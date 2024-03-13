@@ -11,3 +11,9 @@
   (with-stdout-to
    %{target}
    (bash "sudo bpftrace -vl 'tracepoint:syscalls:*io_uring*'"))))
+
+(rule
+ (target tracepoints_gen.bt)
+ (deps tracepoints.spec)
+ (action
+  (run ../gen.exe %{deps} %{target})))

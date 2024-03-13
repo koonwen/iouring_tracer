@@ -48,16 +48,18 @@ let transpile_function { probe; domain; name; args } =
   pp_fun ~name:fullname ~lines:Builtins.[ time; printf fmt arg_ids ]
 
 let () =
-  let f_path =
-    try Sys.argv.(1) with _ -> failwith "Need to supply file path as argument"
+  let f_input =
+    try Sys.argv.(1)
+    with _ -> failwith "Need to supply input file path as argument"
   in
-  let gen imd =
-    Out_channel.with_open_bin "bpfgen.bt" (fun oc ->
-        let ppf = Format.formatter_of_out_channel oc in
-        let fun_list =
-          entry "Tracing IO_uring ..." :: List.map transpile_function imd
-        in
-        pp_program ppf ~fun_list)
+  let f_output =
+    try Sys.argv.(2)
+    with _ -> failwith "Need to supply output file path as argument"
   in
-  let t = Spec_reader.read_spec f_path in
-  gen t
+  let imd = Spec_reader.read_spec f_input in
+  Out_channel.with_open_bin f_output (fun oc ->
+      let ppf = Format.formatter_of_out_channel oc in
+      let fun_list =
+        entry "Tracing IO_uring ..." :: List.map transpile_function imd
+      in
+      pp_program ppf ~fun_list)
