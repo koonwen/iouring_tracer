@@ -40,7 +40,7 @@ let transpile_function { probe; domain; name; args } =
   let open Format in
   let fullname = sprintf "%s:%s:%s" probe domain name in
   let fmt_types = List.map fmt_spec args |> String.concat ", " in
-  let fmt = " (%s) %s: " ^ fmt_types ^ "\\n" in
+  let fmt = " (%s) %s: (" ^ fmt_types ^ ")\\n" in
   let arg_ids =
     "comm" :: "probe"
     :: List.map (fun { identifier; _ } -> sprintf "args->%s" identifier) args

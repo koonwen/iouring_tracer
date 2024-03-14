@@ -5,12 +5,13 @@ LIBS = -luring
 WORKSPACE_ROOT=..
 BIN_DIR=$(WORKSPACE_ROOT)/_build/default/bin
 OBPF=$(BIN_DIR)/obpf.exe
+TRACEPOINT_GEN=../_build/default/lib/bpftrace/bt/tracepoints_gen.bt
 
 time: time_async time_seq
 
 trace :
 	dune build ..
-	sudo ../_build/default/bin/obpf.exe trace -vv "./read_async.bin sample.txt sample.txt sample.txt"
+	sudo ../_build/default/bin/obpf.exe trace -p$(TRACEPOINT_GEN) -vv "./read_async.bin sample.txt sample.txt sample.txt"
 
 time_async: read_async.bin sample.txt
 	time ./read_async.bin sample.txt sample.txt sample.txt

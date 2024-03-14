@@ -1,3 +1,4 @@
 (* module Gen = Gen *)
-module Driver = Driver
 module Bpftrace = Bpftrace
+module Driver = Driver
+module Runtime_events_hook = Runtime_events_hook

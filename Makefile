@@ -1,5 +1,6 @@
 OBPF=_build/default/bin/obpf.exe
 PROG_BINARY=_build/default/test/test_eio.exe
+TRACEPOINT_GEN=_build/default/lib/bpftrace/bt/tracepoints_gen.bt
 SUDO=sudo env "PATH=$(PATH)"
 
 build:
@@ -13,8 +14,8 @@ gen: build
 test_trace:
 	$(SUDO) dune exec -- obpf trace $(PROG_BINARY)
 
-test_gen_trace:
-	$(SUDO) dune exec -- obpf trace -p_build/default/lib/bpftrace/bt/tracepoints_gen.bt $(PROG_BINARY)
+test_gen_trace_eio:
+	$(SUDO) dune exec -- obpf trace -p$(TRACEPOINT_GEN) $(PROG_BINARY)
 
 clean:
 	$(SUDO) dune clean
