@@ -22,15 +22,13 @@ let get_events ic =
 let bpftrace_ev_handler _i _ts ty s =
   match User.tag ty with Io_uring -> Printf.printf "%s\n%!" s | _ -> ()
 
-let trace_poll ?ev_handler_op filename alive  =
+let trace_poll ?ev_handler_op filename =
   let ev_handler = Option.value ~default:bpftrace_ev_handler ev_handler_op in
   In_channel.with_open_text filename (fun ic ->
       start ();
       let cursor = create_cursor None in
-      let cb =
-        Callbacks.create () |> Callbacks.add_user_event ty ev_handler
-      in
-      while alive () do
+      let cb = Callbacks.create () |> Callbacks.add_user_event ty ev_handler in
+      while true do
         get_events ic;
         ignore (read_poll cursor cb None);
         Unix.sleepf 0.1

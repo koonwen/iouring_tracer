@@ -19,7 +19,7 @@ test_gen_trace_eio:
 
 clean:
 	$(SUDO) dune clean
-	rm bpfgen.bt trace.t
+	rm -rfv *.events
 
 switch:
 	opam switch create . -y

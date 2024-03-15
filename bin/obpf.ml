@@ -8,7 +8,7 @@ let obpf_trace input trace_file log_level bin =
   Fmt_tty.setup_std_outputs ();
   Logs.set_reporter (Logs_fmt.reporter ());
   Logs.set_level log_level;
-  Driver.(runner ~log_file:trace_file ~input (Binary bin))
+  Driver.(runner ~output:trace_file ~input (Binary bin))
 
 let gen_cmd =
   let info = Cmd.info "gen" in
@@ -17,7 +17,7 @@ let gen_cmd =
 let trace_cmd =
   let log_file =
     let doc = "write trace log to FILE" in
-    Arg.(value & opt file "trace.txt" & info [ "l" ] ~docv:"FILE" ~doc)
+    Arg.(value & opt file "io_uring.events" & info [ "l" ] ~docv:"FILE" ~doc)
   in
   let input =
     let bpf_conv =
