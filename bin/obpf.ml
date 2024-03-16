@@ -4,18 +4,18 @@ open Cmdliner
 (* Entry point *)
 let obpf_gen () = ()
 
-let obpf_trace input trace_file log_level bin =
+let obpf_trace input output log_level bin =
   Fmt_tty.setup_std_outputs ();
   Logs.set_reporter (Logs_fmt.reporter ());
   Logs.set_level log_level;
-  Driver.(runner ~output:trace_file ~input (Binary bin))
+  Driver.(runner ~input output (Binary bin))
 
 let gen_cmd =
   let info = Cmd.info "gen" in
   Cmd.v info Term.(const obpf_gen $ const ())
 
 let trace_cmd =
-  let log_file =
+  let output =
     let doc = "write trace log to FILE" in
     Arg.(value & opt file "io_uring.events" & info [ "l" ] ~docv:"FILE" ~doc)
   in
@@ -41,7 +41,7 @@ let trace_cmd =
   let man = [ `S Manpage.s_description ] in
   let info = Cmd.info "trace" ~version:"%%VERSION%%" ~doc ~man in
   Cmd.v info
-    Term.(const obpf_trace $ input $ log_file $ Logs_cli.level () $ program)
+    Term.(const obpf_trace $ input $ output $ Logs_cli.level () $ program)
 
 let obpf =
   let doc = Cmd.info "obpf" in
