@@ -6,6 +6,6 @@ let write_ev : int -> unit = fun _i -> failwith "Not implemented"
 let spawn () =
   let t =
     Thread.create bpf_uring_trace (fun () ->
-        Printf.printf "hello from callback")
+        Printf.printf "hello from OCaml callback\n")
   in
   Thread.join t
