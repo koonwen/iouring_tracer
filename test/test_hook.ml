@@ -1,0 +1,3 @@
+open Hook
+
+let () = spawn ()

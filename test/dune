@@ -1,3 +1,3 @@
 (executables
- (names test_gen test_read_async test_custom_events)
- (libraries eio_linux eio obpftrace logs logs.fmt fmt.tty))
+ (names test_gen test_read_async test_custom_events test_hook)
+ (libraries eio_linux eio obpftrace logs logs.fmt fmt.tty hook))

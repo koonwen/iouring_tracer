@@ -1,0 +1,34 @@
+(library
+ (name hook)
+ (foreign_stubs
+  (language c)
+  (names stubs))
+ (c_library_flags -lelf -lz)
+ (foreign_archives bpf)
+ (extra_objects trace_uring)
+ ; (install_c_headers trace_uring)
+ (libraries threads))
+
+; Copy header for protoypes
+
+(rule
+ (mode
+  (promote (until-clean)))
+ (action
+  (copy# bpf_uring_events/src/trace_uring.h trace_uring.h)))
+
+; Sandbox build
+(data_only_dirs bpf_uring_events)
+
+(rule
+ (deps
+  (source_tree bpf_uring_events))
+ (targets trace_uring.o libbpf.a)
+ (action
+  (no-infer
+   (progn
+    (chdir
+     bpf_uring_events/src
+     (run make))
+    (copy bpf_uring_events/src/.output/libbpf.a libbpf.a)
+    (copy bpf_uring_events/src/.output/trace_uring.o trace_uring.o)))))
