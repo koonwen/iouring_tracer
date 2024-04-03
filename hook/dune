@@ -5,7 +5,9 @@
   (names stubs))
  (c_library_flags -lelf -lz)
  (foreign_archives bpfbundle)
- (libraries threads))
+ (libraries threads)
+ (preprocess
+  (pps ppx_deriving.enum)))
 
 ; Copy header for protoypes
 

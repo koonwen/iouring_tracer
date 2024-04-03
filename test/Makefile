@@ -12,3 +12,6 @@ sample.txt:
 
 test: build sample.txt
 	sudo $(OBPF) trace -vv "$(READ_ASYNC) sample.txt sample.txt sample.txt"
+
+async_read: build sample.txt
+	sudo $(READ_ASYNC) sample.txt sample.txt sample.txt

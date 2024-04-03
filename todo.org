@@ -1,0 +1,19 @@
+io_uring_tracer
+* TODO
+* Using Callback method
+** Plan out interface to decode events between libbpf and OCaml
+** Implement callback function to put events into OCaml
+** Implement spawning of C-thread alongside program
+
+* Using epoll method
+** Check out how to use epoll instead of callback
+
+* Extras
+** Add on syscalls
+** Add on kprobes
+** Plan out dynamic loading
+
+ocaml-libbpf
+* TODO
+** Build libbpf and hook into c_stubs (Try using ctypes)
+** Write OCaml bindings for libbpf
