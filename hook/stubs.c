@@ -9,14 +9,13 @@ void hello(value cb);
 CAMLprim value caml_ml_bpf_uring_trace(value cb) {
   CAMLparam1(cb);
   hello(cb);
-  hello2();
   CAMLreturn(Val_unit);
 }
 
 void hello(value cb) {
     caml_release_runtime_system();
 
-    printf("hello\n");
+    run(handle_event);
 
     caml_acquire_runtime_system();
 
