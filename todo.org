@@ -26,6 +26,7 @@ ocaml-libbpf
   ANS: It can, not a problem
   - [X] Get callbacks working in C
   - [X] Hook into bpf program without crashing
+  - [ ] Hook into olly
   - [ ] Add in graceful shutdown
   - [ ] Memlock limit, see if BPF still needs this increase explicitly
   - [ ] Add epoll method
@@ -55,3 +56,48 @@ ocaml-libbpf
     - [ ] Dynamic
     - [ ] Includes
     - [ ] Headers
+
+
+Notes with Sadiq:
+- Previously, the strace like io-uring tracer I demo-ed, utilizes
+  bpftrace to bootstrap writing and loading a bpf program that logs
+  io-uring events. io-uring events here could be anything from
+  io-uring syscalls, static kernel tracepoints, kprobes, etc. Bpftrace
+  makes it easy to hook into these points in the kernel and write
+  small programs that execute when these points are hit.
+  Disadvantages:
+  1. Getting these logs into OCaml is a bit hacky because we get
+     bpftrace process to write to separate file and get out OCaml
+     process to periodically read them.
+  2. This means we rely on bpftrace third party external dependency,
+     which is not as extensible as we would like.
+
+Decided to migrate from using bpftrace to libbpf implement our bpf
+program (How does bpftrace work?)
+  Advantages:
+  - More portable
+  - More fine-grain control over how the kernel program works and
+    better API's like bpf-ringbuffer.
+  - Instead of using file indirection to get write and read events. We
+    can use the ringbuffer which maps between user and kernel
+    space. Then I use OCaml callbacks to write into custom events
+  Disadvantages:
+  - Not easy to write, and carries along the static build of libbpf -
+    incurs long build time
+
+- Currently, I have a minimal working example for the libbpf backend
+  that hooks into io_uring tracepoints and writes these events via the
+  callbacks.
+
+ Questions:
+- To write the c-bindings library for libbpf, is it preferable to
+  vendor the c-library as a stand-alone or require it as a system
+  dependency? I see that the uring library does the former but not
+  sure what's good practice.
+
+- I tried using ctypes stub generation to implement the bindings but
+  got some undefined symbols error, is it worthwhile trying to debug
+  this or go for the hand written stubs?
+
+- About the C API's for zero impact monitoring. If I use them, will
+  olly have trouble visualizing this info?
