@@ -30,9 +30,9 @@ let bpf_ev = User.register "io-uring" IO_URING_TRACEPOINT Type.int
 let write_ev : int -> unit = fun i -> User.write bpf_ev i
 let _ = Callback.register "write_ev" write_ev
 
-let spawn () =
+let spawn f =
   Runtime_events.start ();
-  let t = Thread.create bpf_uring_trace () in
+  let _t = Thread.create bpf_uring_trace () in
   let cur = Runtime_events.create_cursor None in
   let cb =
     Runtime_events.Callbacks.create ()
@@ -42,8 +42,12 @@ let spawn () =
            in
            Printf.printf "got %s\n%!" ev_name)
   in
-  while true do
-    Unix.sleepf 0.5;
-    Runtime_events.read_poll cur cb None |> ignore
-  done;
-  Thread.join t
+  f ();
+  Runtime_events.read_poll cur cb None |> ignore;
+  raise Thread.Exit
+
+let run f =
+  let _t = Thread.create bpf_uring_trace () in
+  Thread.delay 1.0;
+  (try f () with _ -> ());
+  raise Thread.Exit

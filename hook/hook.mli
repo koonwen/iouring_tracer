@@ -1,4 +1,5 @@
-val spawn : unit -> unit
+val spawn : (unit -> unit) -> unit
+val run : (unit -> unit) -> unit
 
 type tracepoints =
   | IO_URING_COMPLETE
@@ -17,4 +18,5 @@ type tracepoints =
   | IO_URING_SHORT_WRITE
   | IO_URING_SUBMIT_SQE
   | IO_URING_TASK_ADD
-  | IO_URING_TASK_WORK_RUN [@@deriving enum, show]
+  | IO_URING_TASK_WORK_RUN
+[@@deriving enum, show]

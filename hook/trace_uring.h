@@ -4,7 +4,7 @@
 
 #ifndef __TRACE_URING_H
 #define __TRACE_URING_H
-#include <stdlib.h>
+#include <stddef.h>
 
 int run(int (*handle_event)(void*, void*, size_t));
 
