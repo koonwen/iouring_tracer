@@ -2,12 +2,14 @@
  (name hook)
  (foreign_stubs
   (language c)
-  (names stubs))
+  (names stubs)
+  ; (include_dirs /usr/include/x86_64-linux-gnu/)
+  )
  (c_library_flags -lelf -lz)
  (foreign_archives bpfbundle)
- (libraries threads)
+ (libraries threads runtime_events)
  (preprocess
-  (pps ppx_deriving.enum)))
+  (pps ppx_deriving.enum ppx_deriving.show)))
 
 ; Copy header for protoypes
 

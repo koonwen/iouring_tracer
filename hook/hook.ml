@@ -1,4 +1,8 @@
-external bpf_uring_trace : (unit -> unit) -> unit = "caml_ml_bpf_uring_trace"
+[@@@warning "-32"]
+
+open Runtime_events
+
+external bpf_uring_trace : unit -> unit = "caml_ml_bpf_uring_trace"
 
 type tracepoints =
   | IO_URING_COMPLETE
@@ -17,15 +21,29 @@ type tracepoints =
   | IO_URING_SHORT_WRITE
   | IO_URING_SUBMIT_SQE
   | IO_URING_TASK_ADD
-  | IO_URING_TASK_WORK_RUN [@@deriving enum]
+  | IO_URING_TASK_WORK_RUN
+[@@deriving enum, show]
 
+type User.tag += IO_URING_TRACEPOINT
 
-let write_ev : int -> unit = fun _i -> failwith "Not implemented"
-[@@warning "-32"]
+let bpf_ev = User.register "io-uring" IO_URING_TRACEPOINT Type.int
+let write_ev : int -> unit = fun i -> User.write bpf_ev i
+let _ = Callback.register "write_ev" write_ev
 
 let spawn () =
-  let t =
-    Thread.create bpf_uring_trace (fun () ->
-        Printf.printf "hello from OCaml callback\n")
+  Runtime_events.start ();
+  let t = Thread.create bpf_uring_trace () in
+  let cur = Runtime_events.create_cursor None in
+  let cb =
+    Runtime_events.Callbacks.create ()
+    |> Callbacks.add_user_event Type.int (fun _ _ _ i ->
+           let ev_name =
+             tracepoints_of_enum i |> Option.get |> show_tracepoints
+           in
+           Printf.printf "got %s\n%!" ev_name)
   in
+  while true do
+    Unix.sleepf 0.5;
+    Runtime_events.read_poll cur cb None |> ignore
+  done;
   Thread.join t

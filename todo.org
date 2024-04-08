@@ -1,14 +1,15 @@
 io_uring_tracer
 * TODO
 * Using Callback method
-** Plan out interface to decode events between libbpf and OCaml
-** Implement callback function to put events into OCaml
-** Implement spawning of C-thread alongside program
+- [X] Plan out interface to decode events between libbpf and OCaml
+- [ ] Implement callback function to put events into OCaml
+- [ ] Implement spawning of C-thread alongside program
 
 * Using epoll method
 ** Check out how to use epoll instead of callback
 
 * Extras
+** Include spans & timestamps
 ** Add on syscalls
 ** Add on kprobes
 ** Plan out dynamic loading
@@ -17,3 +18,40 @@ ocaml-libbpf
 * TODO
 ** Build libbpf and hook into c_stubs (Try using ctypes)
 ** Write OCaml bindings for libbpf
+
+
+<2024-04-08 Mon> AM
+- [-] Figure out why C-thread cannot put events into the same ring
+  buffer as user process
+  ANS: It can, not a problem
+  - [X] Get callbacks working in C
+  - [X] Hook into bpf program without crashing
+  - [ ] Add in graceful shutdown
+  - [ ] Memlock limit, see if BPF still needs this increase explicitly
+  - [ ] Add epoll method
+  - [ ] Check what low impact monitoring using C primatives for
+    runtime events can do
+
+- [-] Try to get one event written in from C
+  - [X] Does C threading scheduler work pre-emptively or
+    cooperatively?
+    ANS: Pre-emptively. The system reserves the right
+    to execute the yield command itself at any moment. In fact, it
+    exercises this right sufficiently often to permit other threads to
+    execute and to give the illusion that the threads are running in
+    parallel, even on a uniprocessor machine.
+
+  - [X] What happens when you don't grab the runtime lock?
+    ANS: Only one thread at a time is allowed to run OCaml code on a
+    particular domain, data races occur with undefined behaviour
+
+  - [ ] How does the Event module work?
+
+  PM
+- [ ] Wrap one function from libbpf using vendoring method
+  - [ ] Check initial commit for liburing
+  - [ ] How does compilation process work for simple C library.
+    - [ ] Static
+    - [ ] Dynamic
+    - [ ] Includes
+    - [ ] Headers

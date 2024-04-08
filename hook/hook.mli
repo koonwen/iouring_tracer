@@ -17,4 +17,4 @@ type tracepoints =
   | IO_URING_SHORT_WRITE
   | IO_URING_SUBMIT_SQE
   | IO_URING_TASK_ADD
-  | IO_URING_TASK_WORK_RUN [@@deriving enum]
+  | IO_URING_TASK_WORK_RUN [@@deriving enum, show]
