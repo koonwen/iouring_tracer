@@ -57,6 +57,16 @@ ocaml-libbpf
     - [ ] Includes
     - [ ] Headers
 
+<2024-04-09 Tue>
+Fix IO_URING custom events not turining up in olly:
+- [ ] Try on simple custom event ANS: You can see the custom events
+  only when no GC is triggered. (Maybe the runtime buffer is dropping
+  events?)  Yes you can see it when there's only a few events.
+
+- [ ] Look through olly implementation. What runtime buffer is being
+  recorded? Does it track different
+threads
+- [ ] Add custom events polling to bpftrace
 
 Notes with Sadiq:
 - Previously, the strace like io-uring tracer I demo-ed, utilizes
@@ -90,6 +100,8 @@ program (How does bpftrace work?)
   callbacks.
 
  Questions:
+- My custom events aren't appearing in olly, weird?
+
 - To write the c-bindings library for libbpf, is it preferable to
   vendor the c-library as a stand-alone or require it as a system
   dependency? I see that the uring library does the former but not
