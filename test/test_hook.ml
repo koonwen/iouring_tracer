@@ -1,3 +1,4 @@
+[@@@warning "-32"]
 let src = Logs.Src.create "test logs" ~doc:"logging for test suites"
 
 module Log = (val Logs.src_log src : Logs.LOG)

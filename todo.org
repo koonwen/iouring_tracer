@@ -59,13 +59,21 @@ ocaml-libbpf
 
 <2024-04-09 Tue>
 Fix IO_URING custom events not turining up in olly:
-- [ ] Try on simple custom event ANS: You can see the custom events
-  only when no GC is triggered. (Maybe the runtime buffer is dropping
-  events?)  Yes you can see it when there's only a few events.
+- [X] Try on simple custom event
+  Ans: Yes you can see the events. Don't build with dune because it
+  won't capture your program. There is a chance that events will be
+  overwritten but olly will print this to stderr.
 
-- [ ] Look through olly implementation. What runtime buffer is being
-  recorded? Does it track different
-threads
+- [X] Look through olly implementation. What runtime buffer is being
+  recorded? Does it track different threads
+
+  Ans: all threads and ringbuffers are captured.  Need to watch out
+  for the format type you are using fuchsia will capture all event
+  Type's but json will only catch span's
+
+- [X] Name the events
+- [X] Write spans for syscalls (unpolished)
+
 - [ ] Add custom events polling to bpftrace
 
 Notes with Sadiq:

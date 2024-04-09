@@ -9,7 +9,7 @@
  (foreign_archives bpfbundle)
  (libraries threads runtime_events)
  (preprocess
-  (pps ppx_deriving.enum ppx_deriving.show)))
+  (pps ppx_deriving.enum ppx_deriving.show ppx_deriving.ord)))
 
 ; Copy header for protoypes
 

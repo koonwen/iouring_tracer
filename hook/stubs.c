@@ -5,7 +5,7 @@
 #include <time.h>
 
 /* This happens often and is expensive, might want to buffer these calls */
-void cb_write_ev(tracepoint_t i) {
+void cb_write_ev(probe_t probe, int probe_id, span_t span) {
 
   /* Threads must hold the runtime lock when writing to shared
    * memory */
@@ -13,7 +13,7 @@ void cb_write_ev(tracepoint_t i) {
   static const value *write_ev_closure = NULL;
   if (write_ev_closure == NULL)
     write_ev_closure = caml_named_value("write_ev");
-  caml_callback(*write_ev_closure, Val_int(i));
+  caml_callback3(*write_ev_closure, Val_int(probe), Val_int(probe_id), Val_int(span));
   caml_release_runtime_system();
   return;
 }
@@ -21,7 +21,7 @@ void cb_write_ev(tracepoint_t i) {
 int handle_event(void *ctx, void *data, size_t data_sz) {
   const struct event *e = data;
 
-  cb_write_ev(e->tracepoint);
+  cb_write_ev(e->probe, e->probe_id, e->span);
 
   return 0;
 }

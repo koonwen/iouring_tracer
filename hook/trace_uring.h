@@ -28,6 +28,25 @@ typedef enum {
   IO_URING_TASK_WORK_RUN
 } tracepoint_t;
 
+typedef enum {
+  SYS_EXIT_IO_URING_REGISTER,
+  SYS_ENTER_IO_URING_REGISTER,
+  SYS_EXIT_IO_URING_SETUP,
+  SYS_ENTER_IO_URING_SETUP,
+  SYS_EXIT_IO_URING_ENTER,
+  SYS_ENTER_IO_URING_ENTER,
+} syscalls_t;
+
+typedef enum {
+  TRACEPOINT,
+  SYSCALLS,
+} probe_t;
+
+typedef enum {
+    BEGIN,
+    END
+} span_t;
+
 struct trace_entry {
   short unsigned int type;
   unsigned char flags;
@@ -207,7 +226,9 @@ struct trace_event_io_uring_task_work_run {
 /* definition of a sample sent to user-space from BPF program */
 struct event {
   int pid;
-  tracepoint_t tracepoint;
+  probe_t probe;
+  int probe_id;
+  span_t span;
   long ktime_ns;
   char comm[TASK_COMM_LEN];
 };
