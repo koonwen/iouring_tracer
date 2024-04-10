@@ -3,7 +3,6 @@ Tracing tool for Linux IO-uring leveraging
 [`bpftrace`](https://github.com/iovisor/bpftrace) to generate a trace
 log.
 
-
 # TODO
 - [ ] Find io-uring programs that have contention
 - [ ] Attach probes trace data to `Runtime_events`
@@ -80,3 +79,9 @@ Attaching 25 probes...
 @reads[kprobe:io_uring_validate_mmap_request.isra.0]: 4
 @reads[kprobe:io_uring_get_socket]: 6
 ```
+
+# Tracing with Olly
+iouring_tracer comes with a set of custom events that can be hooked
+into the runtime events ring buffer. An example visualization using
+perfetto gives
+![Perfetto trace](test/olly/test_eio_1_perfetto.png)

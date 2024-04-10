@@ -1,4 +1,4 @@
-io_uring_tracer
+IO_URING_TRACER
 * TODO
 * Using Callback method
 - [X] Plan out interface to decode events between libbpf and OCaml
@@ -10,7 +10,7 @@ io_uring_tracer
 
 * Extras
 ** Include spans & timestamps
-** Add on syscalls
+
 ** Add on kprobes
 ** Plan out dynamic loading
 
@@ -72,15 +72,17 @@ Fix IO_URING custom events not turining up in olly:
 - [X] Produce some artifacts using custom events
   - [X] Interactive
   - [X] Against read_async.exe
-  - [ ] Against eio symlink program
+  - [X] Against eio copy program
+  - [X] Update README
+*** PM
+- [ ] Add in graceful shutdown
 
 * Backlog:
 - [ ] Add custom events polling to bpftrace
 - [ ] Add epoll method
 - [ ] How does the Event module work?
-- [ ] Check what low impact monitoring using C primatives for
-- [ ] Add in graceful shutdown
-    runtime events can do
+- [ ] Check what low impact monitoring using C primatives for runtime
+  events can do
 ** Libbpf
 - [ ] Wrap one function from libbpf using vendoring method
   - [ ] Check initial commit for liburing
