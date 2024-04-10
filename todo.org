@@ -19,8 +19,9 @@ ocaml-libbpf
 ** Build libbpf and hook into c_stubs (Try using ctypes)
 ** Write OCaml bindings for libbpf
 
-
-<2024-04-08 Mon> AM
+* Plan
+** <2024-04-08 Mon>
+*** AM
 - [-] Figure out why C-thread cannot put events into the same ring
   buffer as user process
   ANS: It can, not a problem
@@ -28,12 +29,8 @@ ocaml-libbpf
   - [X] Hook into bpf program without crashing
   - [X] Hook into olly
   - [X] Memlock limit, see if BPF still needs this increase explicitly
-  - [ ] Add in graceful shutdown
-  - [ ] Add epoll method
-  - [ ] Check what low impact monitoring using C primatives for
-    runtime events can do
-
-- [-] Try to get one event written in from C
+*** PM
+- [X] Try to get one event written in from C
   - [X] Does C threading scheduler work pre-emptively or
     cooperatively?
     ANS: Pre-emptively. The system reserves the right
@@ -46,18 +43,8 @@ ocaml-libbpf
     ANS: Only one thread at a time is allowed to run OCaml code on a
     particular domain, data races occur with undefined behaviour
 
-  - [ ] How does the Event module work?
-
-  PM
-- [ ] Wrap one function from libbpf using vendoring method
-  - [ ] Check initial commit for liburing
-  - [ ] How does compilation process work for simple C library.
-    - [ ] Static
-    - [ ] Dynamic
-    - [ ] Includes
-    - [ ] Headers
-
-<2024-04-09 Tue>
+** <2024-04-09 Tue>
+*** AM
 Fix IO_URING custom events not turining up in olly:
 - [X] Try on simple custom event
   Ans: Yes you can see the events. Don't build with dune because it
@@ -74,13 +61,37 @@ Fix IO_URING custom events not turining up in olly:
 - [X] Name the events
 - [X] Write spans for syscalls (unpolished)
 
+*** PM:
+- [X] Write a test harness for watch mode and also to run your program
+- [X] Does the bpf ring buffer drop messages?
+  Ans: No
+
+** <2024-04-10 Wed>
+*** AM
+- [X] Fix up development env for laptop
+- [X] Produce some artifacts using custom events
+  - [X] Interactive
+  - [X] Against read_async.exe
+  - [ ] Against eio symlink program
+
+* Backlog:
 - [ ] Add custom events polling to bpftrace
+- [ ] Add epoll method
+- [ ] How does the Event module work?
+- [ ] Check what low impact monitoring using C primatives for
+- [ ] Add in graceful shutdown
+    runtime events can do
+** Libbpf
+- [ ] Wrap one function from libbpf using vendoring method
+  - [ ] Check initial commit for liburing
+  - [ ] How does compilation process work for simple C library.
+    - [ ] Static
+    - [ ] Dynamic
+    - [ ] Includes
+    - [ ] Headers
 
-PM:
-- [ ] Write a test harness for watch mode and also to run your program
-- [ ] Does the bpf ring buffer drop messages?
 
-Notes with Sadiq:
+* Notes with Sadiq:
 - Previously, the strace like io-uring tracer I demo-ed, utilizes
   bpftrace to bootstrap writing and loading a bpf program that logs
   io-uring events. io-uring events here could be anything from
@@ -112,7 +123,7 @@ program (How does bpftrace work?)
   callbacks.
 
  Questions:
-- My custom events aren't appearing in olly, weird?
+- My custom events are appearing. But do these traces look reasonable to you?
 
 - To write the c-bindings library for libbpf, is it preferable to
   vendor the c-library as a stand-alone or require it as a system
@@ -120,8 +131,9 @@ program (How does bpftrace work?)
   sure what's good practice.
 
 - I tried using ctypes stub generation to implement the bindings but
-  got some undefined symbols error, is it worthwhile trying to debug
-  this or go for the hand written stubs?
+  got some undefined symbols error, It looks like the support for
+  ctypes stub generation is not particularly active. Is it worthwhile
+  trying to debug this or go for the hand written stubs?
 
 - About the C API's for zero impact monitoring. If I use them, will
   olly have trouble visualizing this info?

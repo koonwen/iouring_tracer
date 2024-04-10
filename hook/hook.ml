@@ -70,9 +70,6 @@ module Syscalls = struct
       (User.name probe) span
 end
 
-
-
-
 let write_ev : int -> int -> int -> unit =
  fun probe_t probe_id span ->
   match probe_t_of_enum probe_t with

@@ -44,4 +44,4 @@ let read_async (files : string list) =
 let () =
   let dir = "/home/koonwen/Repos/iouring_tracer/test" in
   let f = dir ^ "/" ^ "sample.txt" in
-  Hook.run (fun () -> read_async [f; f])
+  Hook.run (fun () -> read_async [f; f; f])
