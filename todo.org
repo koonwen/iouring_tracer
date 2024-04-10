@@ -26,9 +26,9 @@ ocaml-libbpf
   ANS: It can, not a problem
   - [X] Get callbacks working in C
   - [X] Hook into bpf program without crashing
-  - [ ] Hook into olly
+  - [X] Hook into olly
+  - [X] Memlock limit, see if BPF still needs this increase explicitly
   - [ ] Add in graceful shutdown
-  - [ ] Memlock limit, see if BPF still needs this increase explicitly
   - [ ] Add epoll method
   - [ ] Check what low impact monitoring using C primatives for
     runtime events can do
@@ -75,6 +75,10 @@ Fix IO_URING custom events not turining up in olly:
 - [X] Write spans for syscalls (unpolished)
 
 - [ ] Add custom events polling to bpftrace
+
+PM:
+- [ ] Write a test harness for watch mode and also to run your program
+- [ ] Does the bpf ring buffer drop messages?
 
 Notes with Sadiq:
 - Previously, the strace like io-uring tracer I demo-ed, utilizes
