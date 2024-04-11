@@ -36,7 +36,7 @@ module Tracepoints = struct
         | Some t -> User.register (show t) IO_URING_TRACEPOINT Type.unit)
 
   let get_ev =
-    let registra = make_registra 16 in
+    let registra = make_registra 17 in
     fun t -> registra.(to_enum t)
 
   let cb_show rb_idx ts probe () =
@@ -46,12 +46,9 @@ end
 
 module Syscalls = struct
   type t =
-    | SYS_EXIT_IO_URING_REGISTER
-    | SYS_ENTER_IO_URING_REGISTER
-    | SYS_EXIT_IO_URING_SETUP
-    | SYS_ENTER_IO_URING_SETUP
-    | SYS_EXIT_IO_URING_ENTER
-    | SYS_ENTER_IO_URING_ENTER
+    | SYS_IO_URING_SETUP
+    | SYS_IO_URING_REGISTER
+    | SYS_IO_URING_ENTER
   [@@deriving enum, show { with_path = false }]
 
   let make_registra num_tracepoints =
@@ -61,7 +58,7 @@ module Syscalls = struct
         | Some t -> User.register (show t) IO_URING_SYSCALL Type.span)
 
   let get_ev =
-    let registra = make_registra 6 in
+    let registra = make_registra 3 in
     fun t -> registra.(to_enum t)
 
   let cb_show rb_idx ts probe (span : Type.span) =

@@ -77,13 +77,33 @@ Fix IO_URING custom events not turining up in olly:
 *** PM
 - [ ] Add in graceful shutdown
 
+** <2024-04-11 Thu>
+*** AM
+- [X] Reply Tim about adding USDT probes
+  ANS: Yes libbpf has API's to attach USDT probes.
+
+*** PM
+- [X] Investigate why there are recursive syscalls (programming error)
+  Ans: with olly trace json, and interactive run, it looks like the
+  callbacks are firing in the right linear order. olly trace fuchsia
+  may be recording the events weirdly.
+
 * Backlog:
+- [ ] Replace <bpf/linux.h> with "vmlinux.h"
+- [ ] Figure out how to separate running of the root bpf program and
+  OCaml. Might need to be an external monitor like bpftrace
 - [ ] Add custom events polling to bpftrace
 - [ ] Add epoll method
 - [ ] How does the Event module work?
 - [ ] Check what low impact monitoring using C primatives for runtime
   events can do
+- [ ] Potentially add USDT probes
+- [ ] Runtime lock blocks until a poll point. This messes up the
+  custom events timestamp, see if it's possible to extend custom
+  events to support this- [ ] Work towards packaging and giving a talk about the tool to the internal teams
+
 ** Libbpf
+
 - [ ] Wrap one function from libbpf using vendoring method
   - [ ] Check initial commit for liburing
   - [ ] How does compilation process work for simple C library.
@@ -91,7 +111,6 @@ Fix IO_URING custom events not turining up in olly:
     - [ ] Dynamic
     - [ ] Includes
     - [ ] Headers
-
 
 * Notes with Sadiq:
 - Previously, the strace like io-uring tracer I demo-ed, utilizes
@@ -121,11 +140,14 @@ program (How does bpftrace work?)
     incurs long build time
 
 - Currently, I have a minimal working example for the libbpf backend
-  that hooks into io_uring tracepoints and writes these events via the
-  callbacks.
+  - that hooks into io_uring tracepoints and writes these events via the
+   callbacks.
 
- Questions:
-- My custom events are appearing. But do these traces look reasonable to you?
+  Questions:
+- My custom events are appearing. Do these traces look reasonable to you?
+
+- Need more use-cases to see whether the tool is providing useful
+  trace work, It's a bit of guesswork to see what probes to add.
 
 - To write the c-bindings library for libbpf, is it preferable to
   vendor the c-library as a stand-alone or require it as a system
@@ -139,3 +161,11 @@ program (How does bpftrace work?)
 
 - About the C API's for zero impact monitoring. If I use them, will
   olly have trouble visualizing this info?
+- About the implementation, I used callbacks instead of the polling
+  method to get the notifications into OCaml
+
+- Investigate why there are recursive syscalls (programming error)
+- Work towards packaging and giving a talk about the tool to the internal teams
+- runtime lock blocks until a poll point
+- What kind of data are we looking for in custom events? Just the
+  instance point or something more?
