@@ -4,8 +4,11 @@
   test_read_async
   test_custom_events
   test_hook
+  test_hook2
+  test_hook3
+  test_hook_fxt
   test_interactive)
- (libraries eio_linux eio obpftrace logs logs.fmt fmt.tty hook))
+ (libraries eio_linux eio obpftrace logs logs.fmt fmt.tty hook unix))
 
 ; (rule
 ;  (target sample.txt)

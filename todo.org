@@ -96,6 +96,7 @@ Fix IO_URING custom events not turining up in olly:
 
     ANS: callback ordering is correct but issue still persists.
 
+
 ** <2024-04-15 Mon>
 *** AM:
 - Re-support separate processes for probe and user program
@@ -116,7 +117,7 @@ Fix IO_URING custom events not turining up in olly:
     machine. It varies depending on the size of the machine word of
     the machines.
 
-  - [ ] How do you typically pass pointers into OCaml
+  - [X] How do you typically pass pointers into OCaml
     ANS: Not sure but can use ctypes
   - [X] Understand the header file for libbpf.h
     - [X] What does LIBBPF_API macro do
@@ -133,7 +134,100 @@ Fix IO_URING custom events not turining up in olly:
     - [X] struct bpf_object
     - [X] bpf_object__open_file
 
-** Notes
+*** PM
+- Meeting
+**** Work done recap
+1. Experimented single process, multi-threaded design for getting
+   probe events into same runtime buffer as OCaml user program.
+2. Also experimented with multi-process, single-threaded design.
+3. Hook them up with olly & testing against eio program.
+4. Debugging why there are recursive syscall events recorded
+   (shouldn't be the case). [Unresolved]
+   Steps taken:
+   - Checked if it's a programming error by injecting some printf's
+     into olly to see that callbacks are fired in order. Open and close
+     match and there are no double opens before we see a close.
+   - Noticed that the events are only recorded in recursive fashion
+     when run with fuchsia format but not with json.
+   - Timestamps in perfetto show that the eio.suspend_domain event
+     gets mixed up with our SYS_IO_URING_ENTER event, causing it to
+     read as a recursive span. Suspect that the event registration
+     ID's might overlap with each other. Changed the registration
+     order but this also had no effect.
+   - Spans in Fuchsia match on names? Docs are unclear, source code
+     also impenetrable.
+   - No tools other than perfetto for debug fuchsia format, took a
+     stab at reading the binary but didn't manage to get anything out
+     of that.
+5. Initial work on libbpf c-bindings
+
+**** Trade-off discussion for probe reader design
+#Design1: OCaml user process + C thread w callback write to custom events
+   (current implementation)
+
+Advantages:
+- Enable user to write custom bpf event callback handlers directly in
+  their user program
+- Supports direct usage with olly.
+
+Disadvantages:
+- Won't be able to avoid running OCaml program with root access
+  because bpf programs require sudo permissions.
+- Timestamps are inaccurate because they reflect when events are added
+  into the ring buffer, rather than the actual time they were
+  triggered. i.e. timestamps are subject to poll points when the OCaml
+  user process gives up the runtime lock.
+
+#Design2: OCaml probe process + OCaml user process + add support in olly to
+   consume events from both
+
+Advantages:
+- May be possible to restrict root privileges only to the probing process
+- Timestamping may be more accurate because they go into the runtime
+  buffer closer to real time.
+
+Disadvantages:
+- Lining up the timestamps across processes may be non-trivial since
+  they are recorded not on real-time but against the start of the
+  OCaml process.
+- lose the program-ability of custom bpf event handlers in the user
+  program.
+- requires changes to be made to olly. (In which case, we may want to
+  merge the probing program directly into the olly repo)
+
+**** libbpf stubs
+- standalone library build works with dune. Any advice and convention
+  for dealing with type conversions between OCaml and kernel types?
+  size_t? pointers?
+
+[208343733565115 s] rb_idx:0 (SYS_IO_URING_ENTER) BEGIN (1 open)
+[208343733584743 s] rb_idx:0 (eio.suspend_domain) BEGIN (2 open)
+[208343733588991 s] rb_idx:0 (SYS_IO_URING_ENTER) END   (2 close)
+[208343733589141 s] rb_idx:0 (SYS_IO_URING_ENTER) BEGIN (3 open)
+[208343733651008 s] rb_idx:0 (eio.suspend_domain) END   (3 close)
+[208343733683259 s] rb_idx:0 (SYS_IO_URING_ENTER) END   (1 close)
+   - Even when using multiple processes, recursive events are
+     still appearing even though the ordering does not indicate it.
+
+**** Other questions
+- Should I ping Anil for the programs to debug?
+**** TODO
+Suggestions:
+- emit events with fuchsia. eio_dump.
+- The timestamps are based on clock_monotonic, since the system was
+  booted. Should be no issue across multiple domains recording events.
+- Talk to Beatrice about runtime_events tracing
+
+bpf events use cases:
+1. Check against eio programs.
+2. Write bpftrace script that can give the data.
+
+bpf events design & implementation:
+1. Port eio fuchsia format to the project and emit directly.
+3. Merge two trace formats.
+2. Get tracing dependency out of olly.
+
+**** Notes
 When writing bpf kernel code, the SEC macro (short for section) is
 used to define what libbpf program should create and how/where to
 attach it in the kernel.
@@ -156,7 +250,85 @@ libbpf.h
 bpf.h
 btf.h
 
+** <2024-04-17 Wed>
+*** AM
+- [-] Get usable bpftrace cmdline tool against custom script
+  - [X] Update driver (support interactive use, remove runtime_events cruft)
+  - [X] Fix cmdline usage of trace to be interactive
+  - [X] Set up easy way to load different bt scripts
+  - [X] Test against EIO http use case.
+
+** <2024-04-18 Thu>
+*** AM
+- Digest Missing Manuals IO_uring & investigate slowness
+  - [X] Where does asynchronous work come in io_uring runtime
+
+    ANS: The spawning of io_workers are dependent on the type of io
+    work called. If the io request has a non-blocking option, it
+    preferentially takes the code path that calls this and sets a
+    wakeup notification to read when it's done. No new worker thread
+    is spawned. However, if the IO request only has a blocking api,
+    then this code path spawns new worker threads to concurrently
+    process the blocking requests.
+
+    However, if you want to force uring to use the blocking path to
+    spawn worker threads, this is possible by marking requests into
+    uring as IOSQE_ASYNC which tells it to issue requests
+    asynchronously.
+
+    The other aspect to consider is the number of workers that uring
+    will spawn in response. Uring describes how it automatically
+    determines this. But we can also manually set the number of max
+    workers using IO_URING_REGISTER_IOWQ_MAXWORKERS.
+
+    There are other ways to set this limit which requires setting
+    RLIMIT_NPROC or configuring cgroup process limit.
+
+  - [X] show if worker threads are created
+
+*** PM
+  - [X] try to spawn more worker threads.
+    ANS: liburing doesn't seem to allow us to configure spawning
+    worker threads.
+
+  - [X] figure out why there are lost events
+
+    ANS: bpftrace user program is single threaded and processes events
+    one by one, the kernel side buffer therefore drops events because
+    it the user side cannot clear the buffer fast enough. We can
+    increase the size of the kernel buffer by increasing
+    BPFTRACE_PERF_RB_PAGES config variable.
+
+** <2024-04-19 Fri>
+*** AM
+  - [X] Convert loading of bt files via paths so that config variables
+    work.
+    - ANS: It doesn't matter if it's by script or inline, both don't work
+  - [X] Submit Weeklies
+
+*** PM
+  - [X] Add in config params to bpftrace
+
+
+
+** <2024-04-22 Mon>
+*** AM
+- [X] Port eio fuchsia format to the project and emit directly.
+
+*** PM
+- [ ] Merge two trace formats.
+
+
 * Backlog:
+** tracing analysis
+- [ ] Implement spawning more worker threads
+- [ ] write a test suite to check the number of processes, threads and
+  io-workers for the given target
+- [ ] show tasks sent for async request vs tasks sent for polling
+- [ ] show completion events
+- [ ] Convert eio benchmark program into a polling server.
+- [ ] See what kind of performance bonus io_uring can maximally perform
+
 ** iouring_tracer
 - [ ] Add graceful shutdown C-thread design
 - [ ] Setup Co-RE, Replace <bpf/linux.h> with "vmlinux.h"
@@ -179,7 +351,6 @@ btf.h
   - [ ] See if you can buffer events
 
 ** Libbpf
-
 - [ ] Wrap one function from libbpf using vendoring method
   - [ ] Check initial commit for liburing
   - [ ] How does compilation process work for simple C library.
@@ -245,95 +416,3 @@ program (How does bpftrace work?)
 - runtime lock blocks until a poll point
 - What kind of data are we looking for in custom events? Just the
   instance point or something more?
-
-
-* Meeting <2024-04-16 Tue>
-** Work done recap
-1. Experimented single process, multi-threaded design for getting
-   probe events into same runtime buffer as OCaml user program.
-2. Also experimented with multi-process, single-threaded design.
-3. Hook them up with olly & testing against eio program.
-4. Debugging why there are recursive syscall events recorded
-   (shouldn't be the case). [Unresolved]
-   Steps taken:
-   - Checked if it's a programming error by injecting some printf's
-     into olly to see that callbacks are fired in order. Open and close
-     match and there are no double opens before we see a close.
-   - Noticed that the events are only recorded in recursive fashion
-     when run with fuchsia format but not with json.
-   - Timestamps in perfetto show that the eio.suspend_domain event
-     gets mixed up with our SYS_IO_URING_ENTER event, causing it to
-     read as a recursive span. Suspect that the event registration
-     ID's might overlap with each other. Changed the registration
-     order but this also had no effect.
-   - Spans in Fuchsia match on names? Docs are unclear, source code
-     also impenetrable.
-   - No tools other than perfetto for debug fuchsia format, took a
-     stab at reading the binary but didn't manage to get anything out
-     of that.
-5. Initial work on libbpf c-bindings
-
-** Trade-off discussion for probe reader design
-#Design1: OCaml user process + C thread w callback write to custom events
-   (current implementation)
-
-Advantages:
-- Enable user to write custom bpf event callback handlers directly in
-  their user program
-- Supports direct usage with olly.
-
-Disadvantages:
-- Won't be able to avoid running OCaml program with root access
-  because bpf programs require sudo permissions.
-- Timestamps are inaccurate because they reflect when events are added
-  into the ring buffer, rather than the actual time they were
-  triggered. i.e. timestamps are subject to poll points when the OCaml
-  user process gives up the runtime lock.
-
-#Design2: OCaml probe process + OCaml user process + add support in olly to
-   consume events from both
-
-Advantages:
-- May be possible to restrict root privileges only to the probing process
-- Timestamping may be more accurate because they go into the runtime
-  buffer closer to real time.
-
-Disadvantages:
-- Lining up the timestamps across processes may be non-trivial since
-  they are recorded not on real-time but against the start of the
-  OCaml process.
-- lose the program-ability of custom bpf event handlers in the user
-  program.
-- requires changes to be made to olly. (In which case, we may want to
-  merge the probing program directly into the olly repo)
-
-** libbpf stubs
-- standalone library build works with dune. Any advice and convention
-  for dealing with type conversions between OCaml and kernel types?
-  size_t? pointers?
-
-[208343733565115 s] rb_idx:0 (SYS_IO_URING_ENTER) BEGIN (1 open)
-[208343733584743 s] rb_idx:0 (eio.suspend_domain) BEGIN (2 open)
-[208343733588991 s] rb_idx:0 (SYS_IO_URING_ENTER) END   (2 close)
-[208343733589141 s] rb_idx:0 (SYS_IO_URING_ENTER) BEGIN (3 open)
-[208343733651008 s] rb_idx:0 (eio.suspend_domain) END   (3 close)
-[208343733683259 s] rb_idx:0 (SYS_IO_URING_ENTER) END   (1 close)
-   - Even when using multiple processes, recursive events are
-     still appearing even though the ordering does not indicate it.
-
-** Other questions
-- Should I ping Anil for the programs to debug?
-
-
-
-emit events with fuchsia. eio_dump.
-clock_monotonic, since the system was booted
-
-Talk to Beatrice.
-
-1. Port eio fuchsia format to the project, emit directly.
-2. Get tracing dependency out of olly.
-3. Merge two trace formats.
-4. Check against eio programs.
-
-5. Write bpftrace script that can give the data.

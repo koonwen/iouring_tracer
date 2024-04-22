@@ -36,3 +36,34 @@ CAMLprim value caml_ml_bpf_uring_trace(void) {
 
   CAMLreturn(Val_unit);
 }
+
+void cb_write_ev_fxt(probe_t probe, int probe_id, span_t span) {
+    /* Threads must hold the runtime lock when writing to shared
+     * memory */
+    caml_acquire_runtime_system();
+    static const value *write_ev_closure = NULL;
+    if (write_ev_closure == NULL)
+        write_ev_closure = caml_named_value("write_ev_fxt");
+    caml_callback3(*write_ev_closure, Val_int(probe), Val_int(probe_id), Val_int(span));
+    caml_release_runtime_system();
+    return;
+}
+
+int handle_event_fxt(void *ctx, void *data, size_t data_sz) {
+    const struct event *e = data;
+
+    cb_write_ev_fxt(e->probe, e->probe_id, e->span);
+
+    return 0;
+}
+
+CAMLprim value caml_ml_bpf_uring_trace_fxt(void) {
+    CAMLparam0();
+
+    /* release the lock so that this can run start running in parallel */
+    caml_release_runtime_system();
+
+    run(handle_event_fxt);
+
+    CAMLreturn(Val_unit);
+}
