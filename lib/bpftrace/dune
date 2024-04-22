@@ -5,7 +5,7 @@
  (preprocess
   (pps ppx_expect ppx_inline_test ppx_deriving.show))
  (synopsis "Bpftrace bindings")
- (modules bpftrace tracepoints))
+ (modules bpftrace))
 
 (executable
  (name gen)
@@ -13,19 +13,10 @@
   (pps ppx_deriving.show ppx_deriving.make))
  (modules intermediate spec_reader gen))
 
-(rule
- (target tracepoints.ml)
- (deps
-  (source_tree bt))
- (action
-  (with-stdout-to
-   %{target}
-   (run ocaml-crunch -m plain bt))))
-
-(rule
- (target types.txt)
- (action
-  (with-stdout-to
-   %{target}
-   (bash
-    "sudo bpftrace -vl 'tracepoint:*io_uring*' | grep -E '^\\s{4}(\\S.*$)' | awk '{NF--; print}' | sort -f | uniq -i"))))
+; (rule
+;  (target types.txt)
+;  (action
+;   (with-stdout-to
+;    %{target}
+;    (bash
+;     "sudo bpftrace -vl 'tracepoint:*io_uring*' | grep -E '^\\s{4}(\\S.*$)' | awk '{NF--; print}' | sort -f | uniq -i"))))

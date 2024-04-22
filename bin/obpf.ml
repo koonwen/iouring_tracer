@@ -1,14 +1,22 @@
 open Obpftrace
 open Cmdliner
 
+(* Find .bt scripts *)
+let bt_file_mappings =
+  List.filter (fun filename -> Filename.check_suffix filename "bt") Bt.file_list
+  |> List.map (fun filename ->
+         (filename, Bpftrace.Inline (Bt.read filename |> Option.get)))
+
+let default = List.assoc "default.bt" bt_file_mappings
+
 (* Entry point *)
 let obpf_gen () = ()
 
-let obpf_trace input output log_level bin =
+let obpf_trace log_level output prog =
   Fmt_tty.setup_std_outputs ();
   Logs.set_reporter (Logs_fmt.reporter ());
   Logs.set_level log_level;
-  Driver.(runner ~input output (Binary bin))
+  Driver.(runner ?output prog)
 
 let gen_cmd =
   let info = Cmd.info "gen" in
@@ -17,31 +25,35 @@ let gen_cmd =
 let trace_cmd =
   let output =
     let doc = "write trace log to FILE" in
-    Arg.(value & opt file "io_uring.events" & info [ "l" ] ~docv:"FILE" ~doc)
+    Arg.(value & opt (some string) None & info [ "o" ] ~docv:"FILE" ~doc)
   in
-  let input =
+  let prog =
     let bpf_conv =
-      Arg.conv
-        ( (fun s ->
-            if Sys.file_exists s then Stdlib.Result.ok (Bpftrace.File s)
-            else Stdlib.Result.ok (Bpftrace.Inline s)),
-          Bpftrace.pp_arg )
+      let parser s =
+        match List.assoc_opt s bt_file_mappings with
+        | Some prog -> Result.ok prog
+        | None ->
+            if Sys.file_exists s then Result.ok (Bpftrace.Script s)
+            else Result.error (`Msg "No such script")
+      in
+      let printer = Bpftrace.pp_prog in
+      Arg.conv (parser, printer)
     in
     let doc =
-      "path to bpftrace program. If absent, default io_uring tracepoints are \
-       loaded"
+      let options = Arg.doc_alts (List.map fst bt_file_mappings) in
+      Format.sprintf
+        "path to bpftrace program. If absent, defaults to dumping all io_uring \
+         probes in strace style. Options are %s"
+        options
     in
-    Arg.(value & opt bpf_conv Bpftrace.Default & info [ "p" ] ~docv:"FILE" ~doc)
-  in
-  let program =
-    let doc = "program to trace" in
-    Arg.(required & pos 0 (some string) None & info [] ~docv:"PROGRAM" ~doc)
+    Arg.(
+      value & opt bpf_conv default
+      & info ~absent:"default.bt" [ "p" ] ~docv:"FILE" ~doc)
   in
   let doc = "Program tracer tool using bpftrace" in
   let man = [ `S Manpage.s_description ] in
   let info = Cmd.info "trace" ~version:"%%VERSION%%" ~doc ~man in
-  Cmd.v info
-    Term.(const obpf_trace $ input $ output $ Logs_cli.level () $ program)
+  Cmd.v info Term.(const obpf_trace $ Logs_cli.level () $ output $ prog)
 
 let obpf =
   let doc = Cmd.info "obpf" in

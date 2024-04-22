@@ -7,6 +7,9 @@ build:
 	eval $(opam env)
 	$(SUDO) dune build
 
+trace: build
+	$(SUDO) $(OBPF) trace
+
 gen: build
 	$(SUDO) dune exec -- ./lib/bpftrace/gen.exe _build/default/lib/bpftrace/bt/tracepoints.spec bpfgen.bt
 	cat bpfgen.bt

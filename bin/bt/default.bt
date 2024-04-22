@@ -1,0 +1,32 @@
+BEGIN {
+    time("[%H:%M:%S]: ");
+    printf("Tracing IO_uring...\n");
+}
+
+tracepoint:io_uring:* {
+    @reads[probe] = count();
+    time("[%H:%M:%S]: ");
+    printf("(%s) %s\n", comm, probe);
+}
+
+tracepoint:syscalls:*io_uring* {
+    @reads[probe] = count();
+    time("[%H:%M:%S]: ");
+    printf("(%s) %s\n", comm, probe);
+}
+
+kprobe:create_io_worker {
+    time("[%H:%M:%S]: ");
+    printf("(%s) %s\n", comm, probe);
+}
+
+kprobe:create_io_thread {
+    time("[%H:%M:%S]: ");
+    printf("(%s) %s\n", comm, probe);
+}
+
+kprobe:io_uring_unreg_ringfd
+{
+    printf("Tearing down io_uring\n");
+    exit();
+}
