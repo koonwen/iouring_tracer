@@ -1,0 +1,114 @@
+#!/usr/bin/env bpftrace
+   /*
+    * uring_spans
+
+    *           Show uring syscalls spans with visualized depth for
+    *           instant uring tracepoints For Linux, uses bpftrace and
+    *           eBPF. Should be used with programs that only have one
+    *           ring instance, does not handle parallel syscalls in
+    *           flight
+    *
+    * USAGE: uring_spans.bt
+    *
+    *
+    * Copyright 2024 Tarides
+    * Licensed under the Apache License, Version 2.0 (the "License")
+    *
+    * 23-April-2023	Lee Koon Wen	Created this.
+    */
+
+BEGIN {
+    printf("[%lld] Tracing IO-uring... Hit Ctrl-C to end.\n\n", nsecs);
+    @in_syscall = false;
+    @fire_once["sys_enter_io_uring_setup"] = false;
+    @fire_once["sys_exit_io_uring_setup"] = false;
+    /* Initialized to 0, used to filter for matching io_uring_setup */
+    @fire_multiple["sys_enter_io_uring_register"] = (uint64) 0;
+    @fire_multiple["sys_enter_io_uring_enter"] = (uint64) 0;
+    @tid_seen = (uint64) 0;
+    @ring_id = (uint64) 0;
+ }
+
+/* ===================== Syscall spans ===================== */
+tracepoint:syscalls:sys_enter_io_uring_setup /@fire_once["sys_enter_io_uring_setup"] == false/ {
+    @tid_seen = tid;
+    @fire_once["sys_enter_io_uring_setup"] = true;
+    $start_t = nsecs;
+    @start[tid] = $start_t;
+    if (@in_syscall) { printf("[Error] Trying to enter syscall whilst inside one, Exitting\n"); exit() }
+    @in_syscall = true;
+    printf("[%lld] (%s)", $start_t, comm);
+    printf("%s(entries: 0x%08lx, params: 0x%08lx)\n",
+           probe,
+           ((uint64)(args->entries)),
+           ((uint64)(args->params))
+        )
+}
+
+tracepoint:syscalls:sys_exit_io_uring_setup /@fire_once["sys_exit_io_uring_setup"] == false && tid == @tid_seen/ {
+       @ring_id = args->ret;
+       @fire_once["sys_exit_io_uring_setup"] = true;
+       @ns[probe] = stats(nsecs - @start[tid]);
+       delete(@start[tid]);
+       if (!@in_syscall) { printf("[Error] No matching open syscall, Exitting\n"); exit() }
+       @in_syscall = false;
+       printf("[%lld] (%s) ", nsecs, comm);
+       printf("%s => 0x%lx)\n", probe, args->ret);
+}
+
+tracepoint:syscalls:sys_enter_io_uring_register /args->fd == @ring_id && @in_syscall == false/ {
+    $start_t = nsecs;
+    @start[tid] = $start_t;
+    if (@in_syscall) { printf("[Error] Trying to enter syscall whilst inside one, Exitting\n"); exit() }
+    @in_syscall = true;
+    printf("[%lld] (%s) ", $start_t, comm);
+    printf("%s(fd: 0x%08lx, opcode: 0x%08lx, arg: 0x%08lx, nr_args: 0x%08lx)\n",
+           probe,
+           ((uint64)(args->fd)),
+           ((uint64)(args->opcode)),
+           ((uint64)(args->arg)),
+           ((uint64)(args->nr_args)))
+}
+
+tracepoint:syscalls:sys_enter_io_uring_enter /args->fd == @ring_id && @in_syscall == false/ {
+    $start_t = nsecs;
+    @start[tid] = $start_t;
+    if (@in_syscall) { printf("[Error] Trying to enter syscall whilst inside one, Exitting\n"); exit() }
+    @in_syscall = true;
+    printf("[%lld] (%s) ", $start_t, comm);
+    printf("%s(fd: 0x%08lx, to_submit: 0x%08lx, min_complete: 0x%08lx, flags: 0x%08lx, argp: 0x%08lx, argsz: 0x%08lx)\n",
+           probe,
+           ((uint64)(args->fd)),
+           ((uint64)(args->to_submit)),
+           ((uint64)(args->min_complete)),
+           ((uint64)(args->flags)),
+           ((uint64)(args->argp)),
+           ((uint64)(args->argsz)))
+}
+
+tracepoint:syscalls:sys_exit_io_uring_register,
+tracepoint:syscalls:sys_exit_io_uring_enter /@start[tid]/ {
+    @ns[probe] = stats(nsecs - @start[tid]);
+    delete(@start[tid]);
+    if (!@in_syscall) { printf("[Error] No matching open syscall, Exitting\n"); exit() }
+    @in_syscall = false;
+    printf("[%lld] (%s) ", nsecs, comm);
+    printf("%s => 0x%lx)\n", probe, args->ret);
+}
+
+
+/* =========================================================== */
+
+/* tracepoint:io_uring:* { */
+/*     if (@in_syscall) { */
+/*         printf("----> "); */
+/*     } */
+/*     printf("[%lld] (%s) %s\n", nsecs, comm, probe); */
+/* } */
+
+END {
+    clear(@in_syscall);
+    clear(@fire_once);
+    clear(@fire_multiple);
+    clear(@tid_seen)
+}

@@ -314,9 +314,59 @@ btf.h
 ** <2024-04-22 Mon>
 *** AM
 - [X] Port eio fuchsia format to the project and emit directly.
+  - [X] Swap out serialization engine to use Faraday
+  - [X] Hook up with lwt loop
 
 *** PM
-- [ ] Merge two trace formats.
+- [X] Port contd.
+- [X] Write bpftrace script showing depth
+**** Notes
+liburing usage optimization:
+https://github.com/axboe/liburing/wiki/io_uring-and-networking-in-2023
+
+
+
+** <2024-04-23 Tue>
+*** AM
+- [X] bpftrace with depth
+  - [X] Get timestamping correct
+- [X] Check if the print format provided in the event spec can be used
+  directly
+- [X] Fix timestamp for libbpf version
+
+*** PM
+- [X] Merging Fuchsia trace formats
+  - ANS: Just a simple cat. But perfetto sometimes messes up the
+    spans, so it's a good idea to make sure the thread id or category
+    is different
+- [X] See if you can use libtrace directly
+  - ANS: looks hard to extract.
+
+* NEXT Meeting
+** Integrate eio_trace fuchsia format writer uring trace library
+- Hacky, swapped out serialization engine from eio to faraday
+  because needed to register a callback and I'm not sure if it's
+  possible with eio's capabilities design pattern. Also uses lwt as
+  backend to manage concurrency, may want to do a rewrite of this to
+  use effects
+
+** Write OCaml frontend for bpftrace usage
+- Make it easy to drop-in different bpftrace scripts to be loaded &
+  run
+
+** Investigating io-uring performance on eio http server
+- Question: How much faster performance are we expecting? Online
+  benchmarks are divided on whether io-uring is strictly faster than
+  epoll.
+
+- `strace -c` shows that syscall count for io-uring is substantially
+  lower but the time spent per call is slower. total time spent in
+  kernel ends up being almost identical.
+
+- I'm interested in bench-marking purely the uring bindings and see if
+  there optimization is there. It seems like there a bunch of knobs to
+  twiddle when it comes to using uring effectively but those choices
+  are abstracted by the uring bindings.
 
 
 * Backlog:

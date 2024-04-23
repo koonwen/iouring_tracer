@@ -1,0 +1,74 @@
+#!/usr/bin/env bpftrace
+   /*
+    * uring_ops	Show uring operations and their return values.
+    *		For Linux, uses bpftrace and eBPF.
+    *
+    * USAGE: uring_ops.bt
+    *
+    *
+    * Copyright 2024 Tarides
+    * Licensed under the Apache License, Version 2.0 (the "License")
+    *
+    * 17-April-2023	Thomas Leonard	Created this.
+    */
+
+BEGIN {
+  @op[IORING_OP_NOP] = "NOP";
+  @op[IORING_OP_READV] = "READV";
+  @op[IORING_OP_WRITEV] = "WRITEV";
+  @op[IORING_OP_FSYNC] = "FSYNC";
+  @op[IORING_OP_READ_FIXED] = "READ_FIXED";
+  @op[IORING_OP_WRITE_FIXED] = "WRITE_FIXED";
+  @op[IORING_OP_POLL_ADD] = "POLL_ADD";
+  @op[IORING_OP_POLL_REMOVE] = "POLL_REMOVE";
+  @op[IORING_OP_SYNC_FILE_RANGE] = "SYNC_FILE_RANGE";
+  @op[IORING_OP_SENDMSG] = "SENDMSG";
+  @op[IORING_OP_RECVMSG] = "RECVMSG";
+  @op[IORING_OP_TIMEOUT] = "TIMEOUT";
+  @op[IORING_OP_TIMEOUT_REMOVE] = "TIMEOUT_REMOVE";
+  @op[IORING_OP_ACCEPT] = "ACCEPT";
+  @op[IORING_OP_ASYNC_CANCEL] = "ASYNC_CANCEL";
+  @op[IORING_OP_LINK_TIMEOUT] = "LINK_TIMEOUT";
+  @op[IORING_OP_CONNECT] = "CONNECT";
+  @op[IORING_OP_FALLOCATE] = "FALLOCATE";
+  @op[IORING_OP_OPENAT] = "OPENAT";
+  @op[IORING_OP_CLOSE] = "CLOSE";
+  @op[IORING_OP_FILES_UPDATE] = "FILES_UPDATE";
+  @op[IORING_OP_STATX] = "STATX";
+  @op[IORING_OP_READ] = "READ";
+  @op[IORING_OP_WRITE] = "WRITE";
+  @op[IORING_OP_FADVISE] = "FADVISE";
+  @op[IORING_OP_MADVISE] = "MADVISE";
+  @op[IORING_OP_SEND] = "SEND";
+  @op[IORING_OP_RECV] = "RECV";
+  @op[IORING_OP_OPENAT2] = "OPENAT2";
+  @op[IORING_OP_EPOLL_CTL] = "EPOLL_CTL";
+  @op[IORING_OP_SPLICE] = "SPLICE";
+  @op[IORING_OP_PROVIDE_BUFFERS] = "PROVIDE_BUFFERS";
+  @op[IORING_OP_REMOVE_BUFFERS] = "REMOVE_BUFFERS";
+  @op[IORING_OP_TEE] = "TEE";
+  @op[IORING_OP_SHUTDOWN] = "SHUTDOWN";
+  @op[IORING_OP_RENAMEAT] = "RENAMEAT";
+  @op[IORING_OP_UNLINKAT] = "UNLINKAT";
+  @op[IORING_OP_MKDIRAT] = "MKDIRAT";
+  @op[IORING_OP_SYMLINKAT] = "SYMLINKAT";
+  @op[IORING_OP_LINKAT] = "LINKAT";
+  @op[IORING_OP_MSG_RING] = "MSG_RING";
+  @op[IORING_OP_FSETXATTR] = "FSETXATTR";
+  @op[IORING_OP_SETXATTR] = "SETXATTR";
+  @op[IORING_OP_FGETXATTR] = "FGETXATTR";
+  @op[IORING_OP_GETXATTR] = "GETXATTR";
+  @op[IORING_OP_SOCKET] = "SOCKET";
+  @op[IORING_OP_URING_CMD] = "URING_CMD";
+  @op[IORING_OP_SEND_ZC] = "SEND_ZC";
+  @op[IORING_OP_SENDMSG_ZC] = "SENDMSG_ZC";
+}
+
+tracepoint:io_uring:io_uring_complete {
+  $req = (struct io_kiocb *) args->req;
+  @[comm, @op[$req->opcode], args->res] = count();
+}
+
+END {
+  clear(@op);
+}

@@ -7,7 +7,7 @@ let bt_file_mappings =
   |> List.map (fun filename ->
          (filename, Bpftrace.Inline (Bt.read filename |> Option.get)))
 
-let default = List.assoc "default.bt" bt_file_mappings
+let default = List.assoc "uring_spans.bt" bt_file_mappings
 
 (* Entry point *)
 let obpf_gen () = ()
@@ -47,8 +47,9 @@ let trace_cmd =
         options
     in
     Arg.(
+
       value & opt bpf_conv default
-      & info ~absent:"default.bt" [ "p" ] ~docv:"FILE" ~doc)
+      & info ~absent:"$(b,uring_spans.bt)" [ "p" ] ~docv:"FILE" ~doc)
   in
   let doc = "Program tracer tool using bpftrace" in
   let man = [ `S Manpage.s_description ] in
