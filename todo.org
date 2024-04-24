@@ -342,6 +342,17 @@ https://github.com/axboe/liburing/wiki/io_uring-and-networking-in-2023
 - [X] See if you can use libtrace directly
   - ANS: looks hard to extract.
 
+** <2024-04-24 Wed>
+*** AM
+- [X] Add more bpftrace programs
+  - [X] uring_spans: depth log
+  - [X] uring_ops: op count & time
+  - [X] uring_strace_summary: summary of syscalls on multiple ring instances
+  - [X] uring_tp_strace: strace-like output
+
+*** PM
+- [ ] Parsing for bpftrace output for nicer printing
+
 * NEXT Meeting
 ** Integrate eio_trace fuchsia format writer uring trace library
 - Hacky, swapped out serialization engine from eio to faraday

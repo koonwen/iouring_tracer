@@ -3,10 +3,10 @@
     * uring_spans
 
     *           Show uring syscalls spans with visualized depth for
-    *           instant uring tracepoints For Linux, uses bpftrace and
-    *           eBPF. Should be used with programs that only have one
-    *           ring instance, does not handle parallel syscalls in
-    *           flight
+    *           instant uring tracepoints. Should be used with
+    *           programs that only have one ring instance, does not
+    *           handle parallel syscalls in flight.
+    *           For Linux, uses bpftrace and eBPF.
     *
     * USAGE: uring_spans.bt
     *
@@ -20,19 +20,11 @@
 BEGIN {
     printf("[%lld] Tracing IO-uring... Hit Ctrl-C to end.\n\n", nsecs);
     @in_syscall = false;
-    @fire_once["sys_enter_io_uring_setup"] = false;
-    @fire_once["sys_exit_io_uring_setup"] = false;
-    /* Initialized to 0, used to filter for matching io_uring_setup */
-    @fire_multiple["sys_enter_io_uring_register"] = (uint64) 0;
-    @fire_multiple["sys_enter_io_uring_enter"] = (uint64) 0;
-    @tid_seen = (uint64) 0;
-    @ring_id = (uint64) 0;
- }
+   }
 
 /* ===================== Syscall spans ===================== */
-tracepoint:syscalls:sys_enter_io_uring_setup /@fire_once["sys_enter_io_uring_setup"] == false/ {
+tracepoint:syscalls:sys_enter_io_uring_setup /@in_syscall == false/ {
     @tid_seen = tid;
-    @fire_once["sys_enter_io_uring_setup"] = true;
     $start_t = nsecs;
     @start[tid] = $start_t;
     if (@in_syscall) { printf("[Error] Trying to enter syscall whilst inside one, Exitting\n"); exit() }
@@ -45,9 +37,7 @@ tracepoint:syscalls:sys_enter_io_uring_setup /@fire_once["sys_enter_io_uring_set
         )
 }
 
-tracepoint:syscalls:sys_exit_io_uring_setup /@fire_once["sys_exit_io_uring_setup"] == false && tid == @tid_seen/ {
-       @ring_id = args->ret;
-       @fire_once["sys_exit_io_uring_setup"] = true;
+tracepoint:syscalls:sys_exit_io_uring_setup /tid == @tid_seen/ {
        @ns[probe] = stats(nsecs - @start[tid]);
        delete(@start[tid]);
        if (!@in_syscall) { printf("[Error] No matching open syscall, Exitting\n"); exit() }
@@ -56,7 +46,7 @@ tracepoint:syscalls:sys_exit_io_uring_setup /@fire_once["sys_exit_io_uring_setup
        printf("%s => 0x%lx)\n", probe, args->ret);
 }
 
-tracepoint:syscalls:sys_enter_io_uring_register /args->fd == @ring_id && @in_syscall == false/ {
+tracepoint:syscalls:sys_enter_io_uring_register /@in_syscall == false/ {
     $start_t = nsecs;
     @start[tid] = $start_t;
     if (@in_syscall) { printf("[Error] Trying to enter syscall whilst inside one, Exitting\n"); exit() }
@@ -70,7 +60,7 @@ tracepoint:syscalls:sys_enter_io_uring_register /args->fd == @ring_id && @in_sys
            ((uint64)(args->nr_args)))
 }
 
-tracepoint:syscalls:sys_enter_io_uring_enter /args->fd == @ring_id && @in_syscall == false/ {
+tracepoint:syscalls:sys_enter_io_uring_enter /@in_syscall == false/ {
     $start_t = nsecs;
     @start[tid] = $start_t;
     if (@in_syscall) { printf("[Error] Trying to enter syscall whilst inside one, Exitting\n"); exit() }
@@ -96,19 +86,36 @@ tracepoint:syscalls:sys_exit_io_uring_enter /@start[tid]/ {
     printf("%s => 0x%lx)\n", probe, args->ret);
 }
 
-
 /* =========================================================== */
 
-/* tracepoint:io_uring:* { */
-/*     if (@in_syscall) { */
-/*         printf("----> "); */
-/*     } */
-/*     printf("[%lld] (%s) %s\n", nsecs, comm, probe); */
-/* } */
+/* Fix to a singular ring */
+tracepoint:io_uring:io_uring_create {
+    @ring_ctx = args->ctx
+}
+
+tracepoint:io_uring:io_uring_complete,
+tracepoint:io_uring:io_uring_cqe_overflow,
+tracepoint:io_uring:io_uring_cqring_wait,
+tracepoint:io_uring:io_uring_defer,
+tracepoint:io_uring:io_uring_fail_link,
+tracepoint:io_uring:io_uring_file_get,
+tracepoint:io_uring:io_uring_link,
+tracepoint:io_uring:io_uring_local_work_run,
+tracepoint:io_uring:io_uring_poll_arm,
+tracepoint:io_uring:io_uring_queue_async_work,
+tracepoint:io_uring:io_uring_register,
+tracepoint:io_uring:io_uring_req_failed,
+tracepoint:io_uring:io_uring_short_write,
+tracepoint:io_uring:io_uring_submit_sqe,
+tracepoint:io_uring:io_uring_task_add,
+/ args->ctx == @ring_ctx / {
+    if (@in_syscall) {
+        printf("----> ");
+    }
+    printf("[%lld] (%s) %s\n", nsecs, comm, probe);
+}
 
 END {
     clear(@in_syscall);
-    clear(@fire_once);
-    clear(@fire_multiple);
     clear(@tid_seen)
 }

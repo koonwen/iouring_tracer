@@ -1,10 +1,12 @@
 #!/usr/bin/env bpftrace
    /*
-    * uring_multi_strace_summary
+    * uring_strace_summary
 
-    *           Show uring syscall percentage per uring instance
+    *           Show time spent in syscalls per uring
+    *           instance in nanoseconds.
+    *           For Linux, uses bpftrace and eBPF.
     *
-    * USAGE: uring_multi_strace_summary.bt
+    * USAGE: uring_strace_summary.bt
     *
     *
     * Copyright 2024 Tarides
@@ -60,7 +62,6 @@ tracepoint:syscalls:sys_exit_io_uring_enter {
     @rings[@start[tid].0, $name] = stats($elapsed);
     delete(@start[tid]);
    }
-
 
 /* Bash command to group and sort final map */
 /* awk -F'[][]' '{ print $2, $0 }' test.txt | sort -n | awk 'BEGIN {prev_num=-1} {if ($1 != prev_num) print ""; print $0; prev_num=$1}' */
