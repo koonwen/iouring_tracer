@@ -17,7 +17,7 @@ type thread = {
   tid : int64;
 }
 
-val of_writer : Faraday.t -> t
+val of_writer : Eio.Buf_write.t -> t
 
 val instant_event  : ?args:args -> t -> name:string -> thread:thread -> category:string -> ts:int64 -> unit
 val duration_begin : ?args:args -> t -> name:string -> thread:thread -> category:string -> ts:int64 -> unit

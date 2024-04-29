@@ -324,8 +324,6 @@ btf.h
 liburing usage optimization:
 https://github.com/axboe/liburing/wiki/io_uring-and-networking-in-2023
 
-
-
 ** <2024-04-23 Tue>
 *** AM
 - [X] bpftrace with depth
@@ -353,19 +351,62 @@ https://github.com/axboe/liburing/wiki/io_uring-and-networking-in-2023
 *** PM
 - [ ] Parsing for bpftrace output for nicer printing
 
-* NEXT Meeting
-** Integrate eio_trace fuchsia format writer uring trace library
+** <2024-04-25 Thu>
+Hacking days
+*** AM
+- [X] Pick a task
+  ANS: Chose ocaml-crunch project
+- [X] Read about how its done in paper
+- [X] Review how its done in rust & golang
+- [X] See how it's done in ocaml-crunch
+
+*** PM
+**** Meeting
+***** Work done
+- Port eio_trace fuchsia format writer into our project.
+- Write strace & strace summary equivalent bpf scripts for bpftrace
+- Investigate io-uring performance intricacies
+
+***** For discussion
+- What to prioritize?
+  1. Write more bpftrace scripts for tracing uring
+     - Good: Simple, fast, effective
+     - Bad: Not much of an OCaml library, really just a collection of
+       scripts. Cannot output fxt, not extensible
+  2. Work on libbpf bindings for backend supporting tracing & bpf
+     usage
+     - Good: extensible, can integrate directly into OCaml.
+     - Bad: A lot more work to get the same results as bpftrace
+
+- Performance engineering questions for io-uring
+  - Are eio fibers seen as systhreads? Not recommended to share a
+    io-uring instance between multiple threads.
+    https://github.com/axboe/liburing/issues/571#issuecomment-1106480309)
+  - How much faster performance are we expecting? Online benchmarks
+    are divided on whether io-uring is strictly faster than
+    epoll. Looks like we have baseline expectations for read & writes
+    for the uring bindings but they aren't compared against posix
+    backends. We should probably look at doing those first before
+    trying speed up eio?
+  - syscall latency wise, even though we have substantially less
+    syscalls, the time spent inside them is still overall about same
+    as posix backends. On my machine however, as the number of domains
+    go up, the throughput increases in favour of io-uring. At low core
+    counts, performance can dip worse than posix
+
+
+***** Integrate eio_trace fuchsia format writer into uring trace library
 - Hacky, swapped out serialization engine from eio to faraday
   because needed to register a callback and I'm not sure if it's
   possible with eio's capabilities design pattern. Also uses lwt as
   backend to manage concurrency, may want to do a rewrite of this to
   use effects
 
-** Write OCaml frontend for bpftrace usage
+***** Write OCaml frontend for bpftrace usage
 - Make it easy to drop-in different bpftrace scripts to be loaded &
   run
 
-** Investigating io-uring performance on eio http server
+***** Investigating io-uring performance on eio http server
 - Question: How much faster performance are we expecting? Online
   benchmarks are divided on whether io-uring is strictly faster than
   epoll.
@@ -379,9 +420,68 @@ https://github.com/axboe/liburing/wiki/io_uring-and-networking-in-2023
   twiddle when it comes to using uring effectively but those choices
   are abstracted by the uring bindings.
 
+** <2024-04-26 Fri>
+*** AM
+- [X] Try to get original tracer to register callback
+- [ ] Debug Fuchsia trace not being written.
+  ANS: Uncompleted, consolidated and asked for suggestions
+
+*** PM
+- [X] Work on libbpf bindings
+  - [X] Work on the enums for the libbpf_set_strict_mode ANS: flagsets
+    aren't well supported by ctypes, only allowed to pass one flag
+    instead of a list
+  - [X] Work on bpf_object__open
+    ANS: Works for loading an object file
+    but not sure if the memory is allocated correctly
+  - [X] Work on bpf_object__load
+    ANS: Implementation works, Load performs implicit increase in RLIMIT_MEMLOCK
+
+
+** <2024-04-29 Mon>
+*** AM
+- [X] Complete libbpf bindings surface area
+  - [X] libbpf_bpf_get_error
+  - [X] bpf_object__find_program_by_name
+  - [X] bpf_object__next_program
+  - [X] bpf_program__attach
+  - [X] bpf_object__find_map_by_name
+  - [X] bpf_map__fd
+  - [X] bpf_link__destroy
+  - [X] bpf_object__close
+  - [X] ring_buffer__new
+  - [X] ring_buffer__poll
+  - [X] ring_buffer__free
+- [X] Get working OCaml user program
+
+  ANS: Needed to indicate to Foreign.funptr that optional
+  ~runtime_lock:true so that in the callback it reacquires the runtime
+  lock
+
+*** PM
+- [-] Port iouring_tracer to use libbpf bindings
+  - [X] Get structs mapping working in Ctypes
+  - [ ] Get Fxt writer working
+
+
+- [ ] Investigating user/kernel time difference (kernel time is the same, but posix backend is slower in user space)
+  - [ ] Disable the mitigation's & run (Expectation is that posix backend should catch up)
+  - [ ] Try perf to see the user space slowness. (need frame pointers)
+  - [ ] Use magic trace to see where the time is being spent (only on intel machine)
+
+* NEXT Meeting
+<2024-05-02 Thu>
+** TODO
+- [ ] Work on libbpf bindings.
+- [ ] Investigating user/kernel time difference (kernel time is the same, but posix backend is slower in user space)
+  - [ ] Use magic trace to see where the time is being spent
+  - [ ] Try perf to see the user space slowness.
+  - [ ] Disable the mitigation's & run (Expectation is that posix backend should catch up)
+- [ ] Extract fxt tracing into standalone library
+- [ ] Work on Anil's benchmarks in uring repo.
 
 * Backlog:
-** tracing analysis
+** Tracing analysis
 - [ ] Implement spawning more worker threads
 - [ ] write a test suite to check the number of processes, threads and
   io-workers for the given target

@@ -1,4 +1,4 @@
-module W = Faraday
+module W = Eio.Buf_write
 
 type strings = {
   mutable next : int;
@@ -27,7 +27,7 @@ let ( ||| ) = Int64.logor
 let ( <<< ) = Int64.shift_left
 let i64 = Int64.of_int
 
-let word t x = W.LE.write_uint64 t.w x
+let word t x = W.LE.uint64 t.w x
 
 let record ?(data=0L) ~words ~ty t =
   word t (i64 ty ||| (i64 words <<< 4) ||| (data <<< 16))
@@ -68,10 +68,10 @@ module String_ref = struct
   let pad_buffer = String.make 7 (Char.chr 0)
 
   let write_padded w s =
-    W.write_string w s;
+    W.string w s;
     let x = String.length s land 7 in
     if x > 0 then
-      W.write_string w pad_buffer ~len:(8 - x)
+      W.string w pad_buffer ~len:(8 - x)
 
   let write_inline t = function
     | Ref _ -> ()
@@ -153,7 +153,7 @@ module Arg = struct
     | Pointer of int64
     | String of String_ref.t
     | Koid of int64
-
+        
   let ty = function
     | Unit -> 0
     | Int64 _ -> 3
