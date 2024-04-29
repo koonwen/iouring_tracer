@@ -1,3 +1,0 @@
-[submodule "hook/bpf_uring_events"]
-	path = hook/bpf_uring_events
-	url = git@github.com:koonwen/bpf_uring_events.git

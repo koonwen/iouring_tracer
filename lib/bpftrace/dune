@@ -13,6 +13,12 @@
   (pps ppx_deriving.show ppx_deriving.make))
  (modules intermediate spec_reader gen))
 
+(executable
+ (name summary_reader)
+ (preprocess
+  (pps ppx_deriving.show))
+ (modules summary_reader))
+
 ; (rule
 ;  (target types.txt)
 ;  (action

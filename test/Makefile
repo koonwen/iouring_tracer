@@ -16,6 +16,3 @@ test: build sample.txt
 
 async_read: build sample.txt
 	sudo $(READ_ASYNC) sample.txt sample.txt sample.txt
-
-olly: build
-	$(SUDO) olly trace iouring.trace "$(TEST_DIR)/test_hook.exe"

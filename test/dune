@@ -1,16 +1,10 @@
 (executables
- (names
-  test_gen
-  test_read_async
-  test_custom_events
-  test_hook
-  test_hook2
-  test_hook3
-  test_hook_fxt
-  test_interactive)
- (libraries eio_linux eio obpftrace logs logs.fmt fmt.tty hook unix))
+ (names test_gen test_read_async)
+ (libraries eio_linux eio obpftrace logs logs.fmt fmt.tty unix))
 
-; (rule
-;  (target sample.txt)
-;  (action
-;   (bash "fallocate -l 1G sample.txt")))
+(rule
+ (mode
+  (promote (until-clean)))
+ (target sample.txt)
+ (action
+  (bash "fallocate -l 1G sample.txt")))
