@@ -1,0 +1,40 @@
+; Step 1: Compile OCaml generator that takes in definitions in defs.h
+
+(executable
+ (name def_generator)
+ (modules def_generator)
+ (libraries ctypes.stubs ctypes defs))
+
+; Step 2: Execute OCaml generator in step 1, producing C generator
+
+(rule
+ (targets defs_stubs_gen.c)
+ (deps def_generator.exe)
+ (action
+  (run %{deps})))
+
+; Step 3: Compile C generator produced in step 2
+
+(rule
+ (targets defs_stubs_gen.out)
+ (deps defs_stubs_gen.c)
+ (action
+  (bash
+   "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -o %{targets}")))
+
+; Step 4: Execute C generator from Step 3 to produce OCaml type definitions
+
+(rule
+ (targets defs_generated.ml)
+ (deps defs_stubs_gen.out defs.h)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{deps} -ml))))
+
+; Step 5: Add in types dependent on definitions discovered in defs.h
+
+(library
+ (name definitions)
+ (modules defs_generated definitions)
+ (libraries ctypes defs))

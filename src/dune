@@ -1,3 +1,11 @@
 (executable
  (name trace)
- (libraries ocaml_libbpf unix fxt eio eio_linux ctypes ctypes-foreign))
+ (libraries
+  ocaml_libbpf
+  unix
+  fxt
+  eio
+  eio_linux
+  ctypes
+  ctypes-foreign
+  definitions))

@@ -35,7 +35,7 @@ typedef enum {
 
 typedef enum {
   TRACEPOINT,
-  SYSCALLS,
+  SYSCALL,
 } probe_t;
 
 typedef enum {
