@@ -1,4 +1,3 @@
-#line 1 "src/bpf_uring_events/defs.h"
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2020 Andrii Nakryiko, 2024 Koonwen Lee */
 

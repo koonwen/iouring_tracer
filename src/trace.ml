@@ -12,13 +12,14 @@ let handle_event fxt =
   let _handle_event _ctx data _sz =
     let event = !@(from_voidp D.struct_event data) in
     let pid = getf event D.pid |> Int64.of_int in
+    let tid = getf event D.tid |> Int64.of_int in
     let probe_t = getf event D.probe in
     let probe_id = getf event D.probe_id in
     let span = getf event D.span in
-    let ts = getf event D.ktime_ns |> Signed.Long.to_int64 in
+    let ts = getf event D.ktime_ns |> Unsigned.UInt64.to_int64 in
     let comm = getf event D.comm |> D.char_array_as_string in
     let thread =
-      { Fxt.Write.pid; tid = Thread.self () |> Thread.id |> Int64.of_int }
+      { Fxt.Write.pid; tid }
     in
     (match probe_t with
     | D.TRACEPOINT ->

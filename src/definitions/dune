@@ -25,6 +25,13 @@
 ; Step 4: Execute C generator from Step 3 to produce OCaml type definitions
 
 (rule
+ (mode
+  (promote (until-clean)))
+ (targets defs.h)
+ (action
+  (copy ../defs.h defs.h)))
+
+(rule
  (targets defs_generated.ml)
  (deps defs_stubs_gen.out defs.h)
  (action

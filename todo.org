@@ -459,11 +459,16 @@ Hacking days
   lock
 
 *** PM
-- [-] Port iouring_tracer to use libbpf bindings
+- [X] Port iouring_tracer to use libbpf bindings
   - [X] Get structs mapping working in Ctypes
-  - [ ] Get Fxt writer working
+  - [X] Get Fxt writer working
 
+** <2024-04-30 Tue>
+*** AM
+- [X] Fix timestamping
 
+*** PM
+- [ ] Fix types & tid
 - [ ] Investigating user/kernel time difference (kernel time is the same, but posix backend is slower in user space)
   - [ ] Disable the mitigation's & run (Expectation is that posix backend should catch up)
   - [ ] Try perf to see the user space slowness. (need frame pointers)

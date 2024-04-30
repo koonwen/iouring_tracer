@@ -9,3 +9,38 @@
   ctypes
   ctypes-foreign
   definitions))
+
+(data_only_dirs bpf_uring_events)
+
+(rule
+ (mode
+  (promote (until-clean)))
+ (deps
+  (source_tree bpf_uring_events))
+ (targets trace_uring.bpf.o defs.h)
+ (action
+  (no-infer
+   (progn
+    (chdir
+     bpf_uring_events
+     (run make))
+    (copy bpf_uring_events/output/trace_uring.bpf.o trace_uring.bpf.o)
+    (copy# bpf_uring_events/defs.h defs.h)))))
+
+; (rule
+;  (alias bpf)
+;  (target trace_uring.bpf.o)
+;  (deps trace_uring.bpf.c definitions/defs.h vmlinux.h)
+;  (action
+;   (run
+;    clang
+;    -g
+;    -O2
+;    -target
+;    bpf
+;    -I
+;    definitions
+;    -c
+;    trace_uring.bpf.c
+;    -o
+;    %{target})))

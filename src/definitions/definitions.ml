@@ -5,10 +5,11 @@ type event
 let struct_event : event structure typ = structure "event"
 let ( -: ) ty label = field struct_event label ty
 let pid = int -: "pid"
+let tid = int -: "tid"
 let probe = probe_t -: "probe"
 let probe_id = int -: "probe_id"
 let span = span_t -: "span"
-let ktime_ns = long -: "ktime_ns"
+let ktime_ns = uint64_t -: "ktime_ns"
 let comm = array task_comm_len char -: "comm"
 let _ = seal struct_event
 
