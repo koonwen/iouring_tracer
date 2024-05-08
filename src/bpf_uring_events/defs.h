@@ -201,22 +201,22 @@ struct trace_event_io_uring_submit_sqe {
   char *op_str;
 };
 
-struct trace_event_io_uring_task_add {
-  struct trace_entry ent;
-  void *ctx;
-  void *req;
-  unsigned long long user_data;
-  unsigned short opcode;
-  int mask;
-  char *op_str;
-};
+/* struct trace_event_io_uring_task_add { */
+/*   struct trace_entry ent; */
+/*   void *ctx; */
+/*   void *req; */
+/*   unsigned long long user_data; */
+/*   unsigned short opcode; */
+/*   int mask; */
+/*   char *op_str; */
+/* }; */
 
-struct trace_event_io_uring_task_work_run {
-  struct trace_entry ent;
-  void *tctx;
-  unsigned int count;
-  unsigned int loops;
-};
+/* struct trace_event_io_uring_task_work_run { */
+/*   struct trace_entry ent; */
+/*   void *tctx; */
+/*   unsigned int count; */
+/*   unsigned int loops; */
+/* }; */
 
 #define TASK_COMM_LEN 16
 /* definition of a sample sent to user-space from BPF program */

@@ -8,7 +8,7 @@
 ; Step 2: Execute OCaml generator in step 1, producing C generator
 
 (rule
- (targets defs_stubs_gen.c)
+ (targets defs_stubs_gen.c uring_ops_stubs_gen.c)
  (deps def_generator.exe)
  (action
   (run %{deps})))
@@ -17,19 +17,39 @@
 
 (rule
  (targets defs_stubs_gen.out)
- (deps defs_stubs_gen.c)
+ (deps defs_stubs_gen.c defs.h)
+ (action
+  (bash
+   "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -o %{targets}")))
+
+(rule
+ (targets uring_ops_stubs_gen.out)
+ (deps uring_ops_stubs_gen.c uring_ops.h)
  (action
   (bash
    "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -o %{targets}")))
 
 ; Step 4: Execute C generator from Step 3 to produce OCaml type definitions
 
+; Generate vmlinux.h using system bpftool
+
+; (rule
+;  (mode
+;   (promote (until-clean)))
+;  (targets vmlinux.h)
+;  (action
+;   (with-stdout-to
+;    %{targets}
+;    (run /usr/sbin/bpftool btf dump file /sys/kernel/btf/vmlinux format c))))
+
 (rule
  (mode
   (promote (until-clean)))
- (targets defs.h)
+ (targets defs.h uring_ops.h)
  (action
-  (copy ../defs.h defs.h)))
+  (progn
+   (copy ../defs.h defs.h)
+   (copy ../uring_ops.h uring_ops.h))))
 
 (rule
  (targets defs_generated.ml)
@@ -39,9 +59,17 @@
    %{targets}
    (run %{deps} -ml))))
 
+(rule
+ (targets uring_ops_generated.ml)
+ (deps uring_ops_stubs_gen.out uring_ops.h)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{deps} -ml))))
+
 ; Step 5: Add in types dependent on definitions discovered in defs.h
 
 (library
  (name definitions)
- (modules defs_generated definitions)
+ (modules defs_generated uring_ops_generated definitions)
  (libraries ctypes defs))

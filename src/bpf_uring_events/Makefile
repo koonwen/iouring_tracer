@@ -3,11 +3,12 @@ OUTPUT := output
 CLANG ?= clang
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= /usr/sbin/bpftool
-INCLUDES := -I$(OUTPUT) -I/usr/include/x86_64-linux-gnu/
 CFLAGS := -g -Wall -fPIC
 ARCH := $(shell uname -m | sed 's/x86_64/x86/')
+VMLINUX := vmlinux/$(ARCH)/vmlinux.h
+INCLUDES := -I$(OUTPUT) -I/usr/include/x86_64-linux-gnu/ -I$(dir $(VMLINUX))
 
-APPS = trace_uring
+APPS = uring_spans trace_uring uring_ops
 
 ifeq ($(V),1)
 	Q =
@@ -22,7 +23,7 @@ else
 endif
 
 .PHONY: all
-all: $(OUTPUT)/$(APPS).skel.h
+all: $(addprefix $(OUTPUT)/,$(addsuffix .skel.h,$(APPS))) $(addprefix $(OUTPUT)/,$(addsuffix .bpf.o,$(APPS)))
 
 .PHONY: clean
 clean:
@@ -33,19 +34,17 @@ $(OUTPUT):
 	$(call msg,MKDIR,$@)
 	$(Q)mkdir -p $@
 
-$(patsubst %,$(OUTPUT)/%.o,$(APPS)): %.o: %.skel.h
-
 # Generate BPF skeletons
 $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT)
 	$(call msg,GEN-SKEL,$@)
 	$(Q)$(BPFTOOL) gen skeleton $< > $@
 
 # Build BPF code
-$(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) defs.h | $(OUTPUT)
+$(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) $(VMLINUX) | $(OUTPUT)
 	$(call msg,BPF,$@)
 	$(Q)$(CLANG) -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH)		      \
 		     $(INCLUDES) -c $(filter %.c,$^) -o $@
-	$(Q)$(LLVM_STRIP) -g $@
+	# $(Q)$(LLVM_STRIP) -g $@
 
 # delete failed targets
 .DELETE_ON_ERROR:

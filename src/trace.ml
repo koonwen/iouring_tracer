@@ -2,7 +2,7 @@ open Ocaml_libbpf
 module F = Libbpf.Functions
 module T = Libbpf.Types
 module W = Fxt.Write
-module D = Definitions
+module D = Definitions.Uring_trace
 
 exception Exit of int
 
@@ -17,10 +17,8 @@ let handle_event fxt =
     let probe_id = getf event D.probe_id in
     let span = getf event D.span in
     let ts = getf event D.ktime_ns |> Unsigned.UInt64.to_int64 in
-    let comm = getf event D.comm |> D.char_array_as_string in
-    let thread =
-      { Fxt.Write.pid; tid }
-    in
+    (* let comm = getf event D.comm |> Definitions.char_array_as_string in *)
+    let thread = { Fxt.Write.pid; tid } in
     (match probe_t with
     | D.TRACEPOINT ->
         let name =
@@ -35,7 +33,6 @@ let handle_event fxt =
         | D.BEGIN -> W.duration_begin fxt ~name ~category:"bpf" ~thread ~ts
         | D.END -> W.duration_end fxt ~name ~category:"bpf" ~thread ~ts
         | D.NONE -> failwith "Unexpected value of span enum"));
-    Printf.printf "Handle_event called from %s\n%!" comm;
     0
   in
   coerce

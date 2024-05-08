@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /* Copyright (c) 2020 Andrii Nakryiko */
 #include "defs.h"
+/* #include "common.h" */
 /* #include "vmlinux.h" */
+#include <linux/types.h>
 #include <time.h>
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
+
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
@@ -18,9 +21,10 @@ static inline int __ker_ev_handler(probe_t probe, int probe_id, span_t span) {
   struct event *e;
 
   e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
-  if (!e)
-    return 0;
-  int id;
+  if (!e) {
+      return 0;
+  };
+  __u64 id;
 
   id = bpf_get_current_pid_tgid();
   e->pid = id >> 32;

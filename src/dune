@@ -1,3 +1,8 @@
+(library
+ (name util)
+ (libraries ocaml_libbpf definitions fxt eio_linux)
+ (modules util))
+
 (executable
  (name trace)
  (libraries
@@ -8,7 +13,18 @@
   eio_linux
   ctypes
   ctypes-foreign
-  definitions))
+  definitions)
+ (modules trace))
+
+(executable
+ (name uring_spans)
+ (libraries util definitions fxt)
+ (modules uring_spans))
+
+(executable
+ (name uring_ops)
+ (libraries util definitions fxt)
+ (modules uring_ops))
 
 (data_only_dirs bpf_uring_events)
 
@@ -17,15 +33,26 @@
   (promote (until-clean)))
  (deps
   (source_tree bpf_uring_events))
- (targets trace_uring.bpf.o defs.h)
+ (targets
+  trace_uring.bpf.o
+  defs.h
+  uring_spans.bpf.o
+  uring_spans.h
+  uring_ops.bpf.o
+  uring_ops.h)
  (action
   (no-infer
    (progn
     (chdir
      bpf_uring_events
      (run make))
+    ; (copy_files bpf_uring_events/output/*)
     (copy bpf_uring_events/output/trace_uring.bpf.o trace_uring.bpf.o)
-    (copy# bpf_uring_events/defs.h defs.h)))))
+    (copy# bpf_uring_events/defs.h defs.h)
+    (copy bpf_uring_events/output/uring_spans.bpf.o uring_spans.bpf.o)
+    (copy# bpf_uring_events/uring_spans.h uring_spans.h)
+    (copy bpf_uring_events/output/uring_ops.bpf.o uring_ops.bpf.o)
+    (copy# bpf_uring_events/uring_ops.h uring_ops.h)))))
 
 ; (rule
 ;  (alias bpf)

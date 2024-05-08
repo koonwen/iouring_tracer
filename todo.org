@@ -5,7 +5,7 @@
 
 ** ocaml-libbpf
 - [X] Build libbpf and hook into c_stubs (Try using ctypes)
-- [ ] Write OCaml bindings for libbpf
+- [X] Write OCaml bindings for libbpf
 
 * Plan
 ** <2024-04-08 Mon>
@@ -468,22 +468,305 @@ Hacking days
 - [X] Fix timestamping
 
 *** PM
-- [ ] Fix types & tid
-- [ ] Investigating user/kernel time difference (kernel time is the same, but posix backend is slower in user space)
-  - [ ] Disable the mitigation's & run (Expectation is that posix backend should catch up)
-  - [ ] Try perf to see the user space slowness. (need frame pointers)
+- [-] Investigating user/kernel time difference (kernel time is the
+  same, but posix backend is slower in user space)
+  - [X] Disable the mitigation's & run (Expectation is that posix
+    backend should catch up)
+
+    ANS: Yes expectations meet, posix backend
+    does get closer to linux time but for some reason, user time
+    increases?
+
+**** Results
+  Mitigations off: Warmup 10
+
+  POSIX
+  2C, 2S:
+  Time (mean ± σ):     169.3 ms ±  21.6 ms    [User: 240.0 ms, System: 214.5 ms]
+  Range (min … max):   135.3 ms … 221.5 ms    20 runs
+
+  "name": "requests:50000 client-domains:2 server-domains:2",
+  "value": 311506.948611763,
+  "units": "requests/s",
+
+  4C, 4S:
+  Time (mean ± σ):     272.1 ms ±  15.0 ms    [User: 634.8 ms, System: 604.0 ms]
+  Range (min … max):   248.6 ms … 293.0 ms    11 runs
+
+  "name": "requests:100000 client-domains:4 server-domains:4",
+  "value": 413993.015731384,
+  "units": "requests/s"
+
+  8C, 8S:
+  Time (mean ± σ):     470.8 ms ±  41.4 ms    [User: 2063.9 ms, System: 1729.7 ms]
+  Range (min … max):   415.5 ms … 553.6 ms    10 runs
+
+  "name": "requests:100000 client-domains:4 server-domains:4",
+  "value": 413993.015731384,
+  "units": "requests/s"
+
+  16C, 16S:
+  Time (mean ± σ):     609.9 ms ±  43.3 ms    [User: 6673.5 ms, System: 4555.6 ms]
+  Range (min … max):   549.3 ms … 690.3 ms    10 runs
+
+  "name": "requests:400000 client-domains:16 server-domains:16",
+  "value": 686330.1100192188,
+  "units": "requests/s"
+
+real	0m0.542s
+user	0m6.002s
+sys	0m4.781s
+
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ------------------
+ 33.20    1.037025          45     23000           writev
+ 29.75    0.929072         538      1726         7 futex
+ 22.02    0.687665          14     46042     23019 readv
+ 11.61    0.362660        2948       123           clock_nanosleep
+  3.33    0.103931          20      5131           ppoll
+  0.03    0.000916          17        52           fcntl
+  0.02    0.000751          30        25         2 accept4
+  0.01    0.000410           7        54           mmap
+  0.01    0.000378          47         8           munmap
+  0.01    0.000285           9        31           close
+  0.00    0.000124           6        18           write
+  0.00    0.000018           3         6           read
+  0.00    0.000007           7         1           sched_getaffinity
+  0.00    0.000005           1         3           sigaltstack
+  0.00    0.000000           0         4         4 lseek
+  0.00    0.000000           0        36           mprotect
+  0.00    0.000000           0         7           brk
+  0.00    0.000000           0         5           rt_sigaction
+  0.00    0.000000           0       134           rt_sigprocmask
+  0.00    0.000000           0         1           rt_sigreturn
+  0.00    0.000000           0         2           pread64
+  0.00    0.000000           0         1         1 access
+  0.00    0.000000           0         1           socket
+  0.00    0.000000           0         1           bind
+  0.00    0.000000           0         1           listen
+  0.00    0.000000           0         1           setsockopt
+  0.00    0.000000           0         1           execve
+  0.00    0.000000           0         1           readlink
+  0.00    0.000000           0         1           arch_prctl
+  0.00    0.000000           0         1           set_tid_address
+  0.00    0.000000           0         3           openat
+  0.00    0.000000           0         5           newfstatat
+  0.00    0.000000           0         1           set_robust_list
+  0.00    0.000000           0         2           pipe2
+  0.00    0.000000           0         5           prlimit64
+  0.00    0.000000           0         1           getrandom
+  0.00    0.000000           0         1           rseq
+  0.00    0.000000           0        33           clone3
+------ ----------- ----------- --------- --------- ------------------
+100.00    3.123247          40     76469     23033 total
+
+  ==============================================================================
+
+  LINUX
+  2C, 2S
+  Time (mean ± σ):     196.6 ms ±  19.4 ms    [User: 153.9 ms, System: 370.1 ms]
+  Range (min … max):   154.6 ms … 236.1 ms    14 runs
+
+  "name": "requests:50000 client-domains:2 server-domains:2",
+  "value": 271570.9050412442,
+  "units": "requests/s",
+
+  4C, 4S
+  Time (mean ± σ):     247.0 ms ±  16.2 ms    [User: 358.4 ms, System: 763.9 ms]
+  Range (min … max):   229.3 ms … 270.8 ms    11 runs
+
+  "name": "requests:100000 client-domains:4 server-domains:4",
+  "value": 480773.76728980854,
+  "units": "requests/s"
+
+  8C, 8S
+  Time (mean ± σ):     343.9 ms ±  35.5 ms    [User: 947.4 ms, System: 1710.9 ms]
+  Range (min … max):   289.4 ms … 400.4 ms    10 runs
+
+  "name": "requests:200000 client-domains:8 server-domains:8",
+  "value": 609663.3503907508,
+  "units": "requests/s"
+
+  16C, 16S
+  Time (mean ± σ):     520.8 ms ±  40.4 ms    [User: 3315.9 ms, System: 4743.2 ms]
+  Range (min … max):   475.8 ms … 617.9 ms    10 runs
+
+  "name": "requests:400000 client-domains:16 server-domains:16",
+  "value": 978569.7329134545,
+  "units": "requests/s"
+
+real	0m0.411s
+user	0m3.290s
+sys	0m4.751s
+
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ------------------
+ 67.78    2.155765        1563      1379           io_uring_enter
+ 17.46    0.555269         486      1141        98 futex
+ 10.96    0.348594        3084       113        10 clock_nanosleep
+  3.68    0.116914        4031        29        19 restart_syscall
+  0.04    0.001144         143         8           brk
+  0.02    0.000654           4       131           rt_sigprocmask
+  0.02    0.000637          19        33           clone3
+  0.02    0.000558           9        56           mmap
+  0.02    0.000514          13        38           close
+  0.01    0.000329           9        36           mprotect
+  0.01    0.000182          10        18           write
+  0.00    0.000000           0         3           read
+  0.00    0.000000           0         4         4 lseek
+  0.00    0.000000           0        10           munmap
+  0.00    0.000000           0         4           rt_sigaction
+  0.00    0.000000           0         2           pread64
+  0.00    0.000000           0         1         1 access
+  0.00    0.000000           0         1           socket
+  0.00    0.000000           0         1           bind
+  0.00    0.000000           0         1           listen
+  0.00    0.000000           0         1           setsockopt
+  0.00    0.000000           0         1           execve
+  0.00    0.000000           0         1           readlink
+  0.00    0.000000           0         3           sigaltstack
+  0.00    0.000000           0         1           arch_prctl
+  0.00    0.000000           0         1           sched_getaffinity
+  0.00    0.000000           0         1           set_tid_address
+  0.00    0.000000           0         3           openat
+  0.00    0.000000           0         5           newfstatat
+  0.00    0.000000           0         1           set_robust_list
+  0.00    0.000000           0         1           eventfd2
+  0.00    0.000000           0         1           pipe2
+  0.00    0.000000           0         4           prlimit64
+  0.00    0.000000           0         1           getrandom
+  0.00    0.000000           0         1           rseq
+  0.00    0.000000           0         1           io_uring_setup
+  0.00    0.000000           0         2           io_uring_register
+------ ----------- ----------- --------- --------- ------------------
+100.00    3.180560        1046      3038       132 total
+
+
+** <2024-05-02 Thu>
+*** AM
+- [-] Investigating user/kernel time difference (kernel time is the
+  same, but posix backend is slower in user space)
+  - [X] Try perf to see the user space slowness. (need frame pointers)
+
+    ANS: Culprit is Iomux.Poll.loop, presumably busy waiting on
+    events.
   - [ ] Use magic trace to see where the time is being spent (only on intel machine)
 
+*** PM
+Meeting
+- [ ] Fix types & tid
+
+** <2024-05-03 Fri>
+*** AM
+- [X] Read up about eio & eio-trace
+
+** <2024-05-06 Mon>
+*** AM
+- [X] Figure out why uring is slower on AMD machine?
+  - [X] Get benchmark results for AMD vs Intel
+
+linux time AMD
+Average real time: 0.1938
+Average user time: 0.1625 : 29.08%
+Average sys time: 0.3967  : 70.92%
+ -> Seconds in syscalls: 0.28
+ -> Seconds  ctx-switch: 0.12
+
+linux time Intel
+Average real time: 0.4567
+Average user time: 0.8132 : 51.53%
+Average sys time: 0.7646  : 48.47%
+ -> Seconds in syscalls: 0.30
+ -> Seconds  ctx-switch: 0.46
+
+posix time AMD
+Average real time: 0.1876
+Average user time: 0.2406 : 44.80%
+Average sys time: 0.2966  : 55.20%
+ -> Seconds in syscalls: 0.28
+ -> Seconds  ctx-switch: 0.02
+
+posix time Intel
+Average real time: 0.6426
+Average user time: 1.2126 : 57.29%
+Average sys time: 0.9038  : 42.71%
+ -> Seconds in syscalls: 0.58 (Instrumentation of strace -c seems sporadic)
+ -> Seconds  ctx-switch: 0.32
+
+From Intel to AMD linux
+~5x faster in user time
+~2x faster in sys time
+
+From Intel to AMD posix
+~5x faster in user time
+~3x faster in sys time
+
+Hypothesis, sys time doesn't seem to scale proportionately. Breakdown
+of sys time shows that there is a significant proportion of time spent
+in ctx-switch. SQPOLL requires kernel thread, on 4 core system,
+running 4 domains means that scheduler needs to juggle 5 system threads.
+
+3 domains, because SQPOLL uses 1 kernel thread
+linux time Intel
+Average real time: 0.537
+Average user time: 0.7407
+Average sys time: 0.71195
+ -> Seconds in syscalls: 0.38 : 53%
+ -> Seconds  ctx-switch: 0.33 : 47%
+
+posix time Intel
+Average real time: 0.62365
+Average user time: 1.06125
+Average sys time: 0.84345
+ -> Seconds in syscalls: 0.54 (Instrumentation of strace -c seems sporadic)
+ -> Seconds  ctx-switch: 0.3
+
+16 domains + SQPOLL
+linux
+Average sys time: 2.0389
+ -> Seconds in syscalls: 1.39 : 68%
+ -> Seconds  ctx-switch: 0.65 : 32%
+
+posix
+Average sys time: 2.0571
+ -> Seconds in syscalls: 1.24 (Instrumentation of strace -c seems sporadic)
+ -> Seconds  ctx-switch: 0.82
+
+32 domains + SQPOLL, should see ctx switch taking a hit
+linux time AMD
+Average real time: 0.5877
+Average user time: 3.0304
+Average sys time: 5.4765
+ -> Seconds in syscalls: 3.62672 : 66%
+ -> Seconds  ctx-switch: 1.84978 : 34%
+
+posix time AMD
+Average real time: 0.6453
+Average user time: 6.6847
+Average sys time: 5.2019
+ -> Seconds in syscalls: 3.33483 (Instrumentation of strace -c seems sporadic)
+ -> Seconds  ctx-switch: 1.86707
+
+
+
+  - [ ] How to tally up time summed up by 'time' command
+  - [ ] Use strace -c to get breakdown in timings
+  - [ ] Check percentage time spent for IO-uring enter in AMD vs Intel
+
+*** PM
+- [ ] Fix typing and ID-ing the of span events
+
+
 * NEXT Meeting
-<2024-05-02 Thu>
 ** TODO
-- [ ] Work on libbpf bindings.
-- [ ] Investigating user/kernel time difference (kernel time is the same, but posix backend is slower in user space)
-  - [ ] Use magic trace to see where the time is being spent
-  - [ ] Try perf to see the user space slowness.
-  - [ ] Disable the mitigation's & run (Expectation is that posix backend should catch up)
-- [ ] Extract fxt tracing into standalone library
+- [ ] Figure out why uring is slower on AMD machine?
 - [ ] Work on Anil's benchmarks in uring repo.
+- [ ] Figure out what kind of bpf programs would be useful for eio,
+  Our library could enable parameterisation of the programs to include
+  (could just work as a case statement & the compiler will remove dead
+  code paths)
+
+- [ ] Extract fxt tracing into standalone library
 
 * Backlog:
 ** Tracing analysis
