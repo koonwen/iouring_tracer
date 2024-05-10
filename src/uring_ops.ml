@@ -64,7 +64,7 @@ let handle_event _ctx data _size fxt =
   0
 
 let () =
-  Util.event_loop_run ~tracefile:"ops.fxt" ~bpf_object_path:"uring_io.bpf.o"
+  Util.event_loop_run ~tracefile:"ops.fxt" ~bpf_object_path:"uring_ops.bpf.o"
     ~program_names:[ "handle_submit"; "handle_complete" ]
     [ handle_event ];
   (* Print unmatched events *)

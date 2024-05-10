@@ -660,10 +660,14 @@ Meeting
 *** AM
 - [X] Read up about eio & eio-trace
 
+
 ** <2024-05-06 Mon>
 *** AM
 - [X] Figure out why uring is slower on AMD machine?
   - [X] Get benchmark results for AMD vs Intel
+  - [X] How to tally up time summed up by 'time' command
+  - [X] Use strace -c to get breakdown in timings
+  - [X] Check percentage time spent for IO-uring enter in AMD vs Intel
 
 linux time AMD
 Average real time: 0.1938
@@ -706,7 +710,7 @@ of sys time shows that there is a significant proportion of time spent
 in ctx-switch. SQPOLL requires kernel thread, on 4 core system,
 running 4 domains means that scheduler needs to juggle 5 system threads.
 
-3 domains, because SQPOLL uses 1 kernel thread
+3 domains, because SQPOLL uses 1 kernel thread, 10,000 total req
 linux time Intel
 Average real time: 0.537
 Average user time: 0.7407
@@ -714,12 +718,22 @@ Average sys time: 0.71195
  -> Seconds in syscalls: 0.38 : 53%
  -> Seconds  ctx-switch: 0.33 : 47%
 
-posix time Intel
-Average real time: 0.62365
-Average user time: 1.06125
-Average sys time: 0.84345
- -> Seconds in syscalls: 0.54 (Instrumentation of strace -c seems sporadic)
- -> Seconds  ctx-switch: 0.3
+linux time AMD
+
+From Intel to AMD linux
+~ faster in user time
+~ faster in sys time
+
+From Intel to AMD posix
+~ faster in user time
+~ faster in sys time
+
+# posix time Intel
+# Average real time: 0.62365
+# Average user time: 1.06125
+# Average sys time: 0.84345
+#  -> Seconds in syscalls: 0.54 (Instrumentation of strace -c seems sporadic)
+#  -> Seconds  ctx-switch: 0.3
 
 16 domains + SQPOLL
 linux
@@ -727,10 +741,10 @@ Average sys time: 2.0389
  -> Seconds in syscalls: 1.39 : 68%
  -> Seconds  ctx-switch: 0.65 : 32%
 
-posix
-Average sys time: 2.0571
- -> Seconds in syscalls: 1.24 (Instrumentation of strace -c seems sporadic)
- -> Seconds  ctx-switch: 0.82
+# posix
+# Average sys time: 2.0571
+#  -> Seconds in syscalls: 1.24 (Instrumentation of strace -c seems sporadic)
+#  -> Seconds  ctx-switch: 0.82
 
 32 domains + SQPOLL, should see ctx switch taking a hit
 linux time AMD
@@ -740,31 +754,70 @@ Average sys time: 5.4765
  -> Seconds in syscalls: 3.62672 : 66%
  -> Seconds  ctx-switch: 1.84978 : 34%
 
-posix time AMD
-Average real time: 0.6453
-Average user time: 6.6847
-Average sys time: 5.2019
- -> Seconds in syscalls: 3.33483 (Instrumentation of strace -c seems sporadic)
- -> Seconds  ctx-switch: 1.86707
+# posix time AMD
+# Average real time: 0.6453
+# Average user time: 6.6847
+# Average sys time: 5.2019
+#  -> Seconds in syscalls: 3.33483 (Instrumentation of strace -c seems sporadic)
+#  -> Seconds  ctx-switch: 1.86707
 
-
-
-  - [ ] How to tally up time summed up by 'time' command
-  - [ ] Use strace -c to get breakdown in timings
-  - [ ] Check percentage time spent for IO-uring enter in AMD vs Intel
 
 *** PM
 - [ ] Fix typing and ID-ing the of span events
 
 
+** <2024-05-07 Tue>
+*** AM
+- [X] Create spans view of ops using libbpf
+  - [X] Implement kernel side
+  - [X] Support user side
+  - [ ] Start working on portability, using compile-once
+    run-everywhere standard,
+
+** <2024-05-10 Fri>
+- [ ] Double check benchmarks
+
+  2C 2S Linux
+  Intel: 408ms
+  AMD: 160ms
+  ~2.55x faster
+
+  1C 2S
+  Intel: 259ms
+  AMD: 126ms
+  ~2x faster
+
+  2S 1C
+  Intel: 553ms
+  AMD: 255ms
+  ~2.2x faster
+
+  1C 1S
+  Intel: 265ms
+  AMD: 156ms
+  ~1.7x faster
+
+No clear reason
+
 * NEXT Meeting
 ** TODO
-- [ ] Figure out why uring is slower on AMD machine?
+- [-] Figure out why uring is slower on AMD machine?
+  Unresolved.
+
 - [ ] Work on Anil's benchmarks in uring repo.
-- [ ] Figure out what kind of bpf programs would be useful for eio,
-  Our library could enable parameterisation of the programs to include
+- [X] Figure out what kind of bpf programs would be useful for eio
+  - [X] Implement a spans version of ops
+  ...
+- [-] Our library could enable parameterisation of the programs to include
   (could just work as a case statement & the compiler will remove dead
   code paths)
+  - [X] User side: Experiment with middleware-like opt-in events.
+  - [ ] Kernel side:
+    - Share ring buffer, issue is that it's quite easy
+    to overflow the buffer, we need a good way to report this to the
+    user or better way of handling it in user land.
+    - Spawning separate programs also not a good idea because tracer
+      picks up extra processes to track
 
 - [ ] Extract fxt tracing into standalone library
 
