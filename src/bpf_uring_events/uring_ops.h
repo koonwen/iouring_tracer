@@ -7,7 +7,9 @@
 
 enum tracepoint_t {
     IO_URING_SUBMIT_SQE,
-    IO_URING_COMPLETE
+    IO_URING_COMPLETE,
+    SYS_ENTER_IO_URING_ENTER,
+    SYS_EXIT_IO_URING_ENTER
 };
 
 struct io_uring_submit_sqe {
@@ -24,6 +26,14 @@ struct io_uring_complete {
     int res;
     unsigned cflags;
 };
+
+/* struct sys_enter_io_uring_enter { */
+/*     unsigned int fd; */
+/*     unsigned long to_submit; */
+/*     unsigned long min_complete; */
+/*     unsigned long flags; */
+/*     unsigned */
+/* } */
 
 struct event {
     enum tracepoint_t t;

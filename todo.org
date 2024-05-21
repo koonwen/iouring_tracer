@@ -641,7 +641,6 @@ sys	0m4.751s
 ------ ----------- ----------- --------- --------- ------------------
 100.00    3.180560        1046      3038       132 total
 
-
 ** <2024-05-02 Thu>
 *** AM
 - [-] Investigating user/kernel time difference (kernel time is the
@@ -697,13 +696,44 @@ Average sys time: 0.9038  : 42.71%
  -> Seconds in syscalls: 0.58 (Instrumentation of strace -c seems sporadic)
  -> Seconds  ctx-switch: 0.32
 
+2C 2S
 From Intel to AMD linux
-~5x faster in user time
-~2x faster in sys time
+~4.6x faster in user time
+~1.9x faster in sys time
+
+2C 2S Mit on
+From Intel to AMD posix
+~4.7x faster in user time
+~3.3x faster in sys time
+
+2C 2S Mit off
+From Intel to AMD linux
+~3x user
+~1.4x sys
 
 From Intel to AMD posix
-~5x faster in user time
-~3x faster in sys time
+~3x user
+~2.3x sys
+
+
+2C 1S
+From Intel to AMD linux
+~3.3x faster in user time
+~1.5x faster in sys time
+
+2C 1S
+From Intel to AMD posix
+~3.5x faster in user time
+~2x faster in sys time
+
+1C 2S
+From Intel to AMD linux
+~3.7x faster in user time
+~1.2x faster in sys time
+
+From Intel to AMD posix
+~4.5x faster in user time
+~2.5x faster in sys time
 
 Hypothesis, sys time doesn't seem to scale proportionately. Breakdown
 of sys time shows that there is a significant proportion of time spent
@@ -761,10 +791,8 @@ Average sys time: 5.4765
 #  -> Seconds in syscalls: 3.33483 (Instrumentation of strace -c seems sporadic)
 #  -> Seconds  ctx-switch: 1.86707
 
-
 *** PM
 - [ ] Fix typing and ID-ing the of span events
-
 
 ** <2024-05-07 Tue>
 *** AM
@@ -799,27 +827,156 @@ Average sys time: 5.4765
 
 No clear reason
 
-* NEXT Meeting
-** TODO
-- [-] Figure out why uring is slower on AMD machine?
-  Unresolved.
+  2C 2S intel - AMD linux
+  mit off
+  Intel  linux [User:550ms, Sys:651ms]
+  Intel  posix [User:830ms, Sys:647ms]
 
-- [ ] Work on Anil's benchmarks in uring repo.
+  Intel  linux [User:800ms, Sys:770ms]
+  Intel  posix [User:1370ms, Sys:930ms]
+
+  AMD    linux [User:160ms, Sys:430ms]
+  AMD    posix [User:240ms, Sys:270ms]
+
+  mit off
+  Intel/AMD  linux [~3.4x user, 1.5x sys]
+  Intel/AMD  posix [~3.5x user, 2.4x sys]
+
+  Intel/AMD  linux [~5x user, 1.8x sys] 50/50
+  Intel/AMD  posix [~5.7x user, 3.4x sys] 60/40
+
+
+
+
+** <2024-05-13 Mon>
+- [X] Post last weeks updates
+** <2024-05-14 Tue>
+- [X] Anil's benchmarks
+  - [X] Write program for creating random synthetic fs
+** <2024-05-15 Wed>
+- [-] Anil's benchmarks
+  - [X] Add on C code for stat vs statx
+  - [ ] Work on syscalls vs uring
+
+** <2024-05-16 Thu>
+*** AM
+  - [X] Share progress report
+
+*** PM
+**** TODO
+- [X] Figure out why uring is slower on AMD machine?
+
+  Performance factors:
+  1. Cheaper syscalls, shows a more pronounced improvement in posix than linux
+  2. Number of syscalls, Favours linux over posix
+
+  Moving from Intel to AMD, effect of (1) overshadows (2) for that
+  specific workload. This is because on small workloads, improvements
+  by (2) is less significant in comparison to (1).
+
 - [X] Figure out what kind of bpf programs would be useful for eio
   - [X] Implement a spans version of ops
   ...
+
+I've put that aside
 - [-] Our library could enable parameterisation of the programs to include
   (could just work as a case statement & the compiler will remove dead
   code paths)
   - [X] User side: Experiment with middleware-like opt-in events.
   - [ ] Kernel side:
     - Share ring buffer, issue is that it's quite easy
-    to overflow the buffer, we need a good way to report this to the
-    user or better way of handling it in user land.
+      to overflow the buffer, we need a good way to report this to the
+      user or better way of handling it in user land.
     - Spawning separate programs also not a good idea because tracer
-      picks up extra processes to track
+      ends up tracking those processes to track
+
+      Suggestion: Keep a counter of in kernel that increments everytime an
+      event cannot be reserved, query at the end of the trace
+
+- [-] Work on Anil's benchmarks in uring repo.
+  - [X] Implement synthetic filesystem generator
+    - [X] Parameterised by depth of dirs, number of files/dir, size of files
+    - [X] Currently randomly generates an fs given those params
+  - [X] stat vs statx
+    Benchmark: run stat vs statx(grab all params) vs statx(grab 1 param) million times over a file
+    ANS: Cost is relatively the same:
+  - [X] uring vs syscalls Benchmark: Run sequential stat vs uring
+    sequential stat vs uring batched. Structually the uring code will
+    be different than the syscalls
+
+    ANS: uring batched was the fastest
+
+  - [ ] Uring only: linked req vs independent req
+    - Wouldn't enforcing any kind of ordering just be a slowdown.
+
+  - [ ] Uring only: optimal buffer size
+    - Not sure what this buffer is for? For holding that stat data? Or
+      any data? This is tied to the size of the queue?
+
+  - [ ] Subdir traversal
 
 - [ ] Extract fxt tracing into standalone library
+
+** <2024-05-17 Fri>
+*** AM
+  - [X] Benchmarks
+    - [X] Update Anil and check what fields are required for the diff
+    - [X] Create new repo and port eio fs_gen
+      - [X] Keep notes for filesystem benchmarking for blogpost
+      - [X] Do C benchmarks instead of OCaml
+    - [X] Consolidate stat tests under the same program with
+      switchable params
+    - [X] Use Hyperfine with warmup for benchmarking (Note Freq scaling / Power)
+      - [X] Account for Freq scaling with warmup runs
+      - [X] Account for caching by clearing cache before each run
+
+
+
+
+** <2024-05-21 Tue>
+*** AM
+- [X] Benchmarks
+  - [X] Read up on available batching mechanisms
+    ANS: Outer while loop and two inner while loop (1st inner adds to sqe until no more space) (2nd reaps at least 1 completion)
+  - [X] Psudeo-code for batched walk
+    - [X] Figure out how to use provided buffers to store & allocate buffers (struct for shared resources)
+      ANS: liburing manages the allocation of cqe's and sqe's so we only need to preallocate the user_data buffers.
+    - [X] Implement some kind of automatic queuing discipline.
+      ANS: Not neccessary because of above.
+
+*** PM
+- [-] Debugging trace results
+  - [ ] Test thomas's workload see if there's a speedup from cutting syscalls.
+  - [ ] Check eio-dump for the statx results to see if perfetto display is the problem
+  - [ ] Try using user data pointer instead of req pointer.
+  - [X] Check uring code/Linux version why fstatat is being used
+    ANS: Used by readdir
+
+* NEXT Meeting
+** TODO <2024-05-16 Thu>
+- [-]  Benchmarks
+  - [X] Update Anil and check what fields are required for the diff
+  - [X] Keep notes for filesystem benchmarking for blogpost
+  - [X] Check out eio repo that creates synthetic fs and tests stat,
+  - [X] Use Hyperfine with warmup for benchmarking (Note Freq scaling / Power)
+  - [X] Do C benchmarks instead of OCaml
+  - [X] Implement uring_batched backend for comparison with sys
+  - [ ] uring_batched is slower, find out with with iouring_tracer
+  - [ ] Better frontend parsing for test params.
+
+- [-] Debugging trace results
+  - [ ] Test thomas's workload see if there's a speedup from cutting syscalls.
+  - [ ] Check eio-dump for the statx results to see if perfetto display is the problem
+  - [ ] Try using user data pointer instead of req pointer.
+  - [X] Check uring code/Linux version why fstatat is being used
+  - [ ] Uring can have parallel syscalls in flight, figure out how to account for this
+
+- [ ] Improving tracing
+  - [ ] Sample syscalls instead of tracing everything
+  - [ ] Kernel mode sharing
+  - [ ] Work individual programs each with their own ring buffer and
+    handler
+
 
 * Backlog:
 ** Tracing analysis
@@ -861,60 +1018,29 @@ No clear reason
     - [ ] Includes
     - [ ] Headers
 
-* Notes with Sadiq:
-- Previously, the strace like io-uring tracer I demo-ed, utilizes
-  bpftrace to bootstrap writing and loading a bpf program that logs
-  io-uring events. io-uring events here could be anything from
-  io-uring syscalls, static kernel tracepoints, kprobes, etc. Bpftrace
-  makes it easy to hook into these points in the kernel and write
-  small programs that execute when these points are hit.
-  Disadvantages:
-  1. Getting these logs into OCaml is a bit hacky because we get
-     bpftrace process to write to separate file and get out OCaml
-     process to periodically read them.
-  2. This means we rely on bpftrace third party external dependency,
-     which is not as extensible as we would like.
 
-Decided to migrate from using bpftrace to libbpf implement our bpf
-program (How does bpftrace work?)
-  Advantages:
-  - More portable
-  - More fine-grain control over how the kernel program works and
-    better API's like bpf-ringbuffer.
-  - Instead of using file indirection to get write and read events. We
-    can use the ringbuffer which maps between user and kernel
-    space. Then I use OCaml callbacks to write into custom events
-  Disadvantages:
-  - Not easy to write, and carries along the static build of libbpf -
-    incurs long build time
+Hi Anil,
 
-- Currently, I have a minimal working example for the libbpf backend
-  - that hooks into io_uring tracepoints and writes these events via the
-   callbacks.
+Thanks for the pointers! I've just got the BPF tracing tool minimally
+working to capture syscalls and operations submitted to uring and
+display them as time slices nicely with perfetto. With that, I'm
+getting started on these benchmarks and had some questions around the
+actual diffing algorithm that'll be useful for crafting the
+benchmarks.
 
-  Questions:
-- My custom events are appearing. Do these traces look reasonable to you?
+- "stat(2) vs statx(2)"
+   What are the required fields?
 
-- Need more use-cases to see whether the tool is providing useful
-  trace work, It's a bit of guesswork to see what probes to add.
+- "io_uring linked requests vs independent requests"
+  Shouldn't enforcing any kind of ordering on the requests be slower
+  than arbritrary requests that can be submitted and complete
+  independently? Unless the question here is about the performance
+  benefit of handling the ordering in userland versus in-kernel?
 
-- To write the c-bindings library for libbpf, is it preferable to
-  vendor the c-library as a stand-alone or require it as a system
-  dependency? I see that the uring library does the former but not
-  sure what's good practice.
+- "also not clear how big the various buffers need to be."
+  What kind of data are we storing in these buffers?
 
-- I tried using ctypes stub generation to implement the bindings but
-  got some undefined symbols error, It looks like the support for
-  ctypes stub generation is not particularly active. Is it worthwhile
-  trying to debug this or go for the hand written stubs?
-
-- About the C API's for zero impact monitoring. If I use them, will
-  olly have trouble visualizing this info?
-- About the implementation, I used callbacks instead of the polling
-  method to get the notifications into OCaml
-
-- Investigate why there are recursive syscalls (programming error)
-- Work towards packaging and giving a talk about the tool to the internal teams
-- runtime lock blocks until a poll point
-- What kind of data are we looking for in custom events? Just the
-  instance point or something more?
+Our current plan is to write these test cases in C and use hyperfine
+to get a high-level idea of their performance. Then we'll come in with
+the BPF tool to understand what's happening in the kernel and use that
+as feedback to add more features to the tool itself.

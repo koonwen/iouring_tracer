@@ -10,23 +10,19 @@ struct {
   __uint(max_entries, 256 * 1024 /* 256 KB */);
 } rb SEC(".maps");
 
-static inline int __init_event(struct event *e, enum tracepoint_t t) {
-  u64 id, ts;
-  /* reserve sample from BPF ringbuf */
-  e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
-  if (!e)
-    return 1;
+/* static inline int __init_event(struct event *e, enum tracepoint_t t) { */
+/*   u64 id, ts; */
 
-  id = bpf_get_current_pid_tgid();
-  ts = bpf_ktime_get_ns();
+/*   id = bpf_get_current_pid_tgid(); */
+/*   ts = bpf_ktime_get_ns(); */
 
-  e->t = t;
-  e->pid = id >> 32;
-  e->tid = id;
-  e->ts = ts;
-  bpf_get_current_comm(&e->comm, sizeof(e->comm));
-  return 0;
-}
+/*   e->t = t; */
+/*   e->pid = id >> 32; */
+/*   e->tid = id; */
+/*   e->ts = ts; */
+/*   bpf_get_current_comm(&e->comm, sizeof(e->comm)); */
+/*   return 0; */
+/* } */
 
 SEC("tp/io_uring/io_uring_submit_sqe")
 int handle_submit(struct trace_event_raw_io_uring_submit_sqe *ctx) {
@@ -34,14 +30,11 @@ int handle_submit(struct trace_event_raw_io_uring_submit_sqe *ctx) {
   struct io_uring_submit_sqe *extra;
   unsigned op_str_off;
 
-  /* if (__init_event(e, IO_URING_SUBMIT_SQE)) return 1; */
   u64 id, ts;
   /* reserve sample from BPF ringbuf */
   e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
   if (!e)
     return 1;
-
-  extra = &(e->extra.io_uring_submit_sqe);
 
   id = bpf_get_current_pid_tgid();
   ts = bpf_ktime_get_ns();
@@ -52,6 +45,7 @@ int handle_submit(struct trace_event_raw_io_uring_submit_sqe *ctx) {
   e->ts = ts;
   bpf_get_current_comm(&e->comm, sizeof(e->comm));
 
+  extra = &(e->extra.io_uring_submit_sqe);
   extra->req = ctx->req;
   extra->opcode = ctx->opcode;
   extra->flags = ctx->flags;
@@ -81,8 +75,6 @@ int handle_complete(struct trace_event_raw_io_uring_complete *ctx) {
   if (!e)
     return 1;
 
-  extra = &(e->extra.io_uring_complete);
-
   id = bpf_get_current_pid_tgid();
   ts = bpf_ktime_get_ns();
 
@@ -92,11 +84,58 @@ int handle_complete(struct trace_event_raw_io_uring_complete *ctx) {
   e->ts = ts;
   bpf_get_current_comm(&e->comm, sizeof(e->comm));
 
+  extra = &(e->extra.io_uring_complete);
   extra->req = ctx->req;
   extra->res = ctx->res;
   extra->cflags = ctx->cflags;
   bpf_printk("req = 0x%llx, res = %d, cflags = %ud", extra->req, extra->res,
              extra->cflags);
+
+  bpf_ringbuf_submit(e, 0);
+  return 0;
+}
+
+SEC("tp/syscalls/sys_enter_io_uring_enter")
+int handle_sys_enter_io_uring_enter(struct trace_event_raw_sys_enter *ctx) {
+  struct event *e;
+
+  u64 id, ts;
+  /* reserve sample from BPF ringbuf */
+  e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
+  if (!e)
+    return 1;
+
+  id = bpf_get_current_pid_tgid();
+  ts = bpf_ktime_get_ns();
+
+  e->t = SYS_ENTER_IO_URING_ENTER;
+  e->pid = id >> 32;
+  e->tid = id;
+  e->ts = ts;
+  bpf_get_current_comm(&e->comm, sizeof(e->comm));
+
+  bpf_ringbuf_submit(e, 0);
+  return 0;
+}
+
+SEC("tp/syscalls/sys_exit_io_uring_enter")
+int handle_sys_exit_io_uring_enter(struct trace_event_raw_sys_enter *ctx) {
+  struct event *e;
+
+  u64 id, ts;
+  /* reserve sample from BPF ringbuf */
+  e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
+  if (!e)
+    return 1;
+
+  id = bpf_get_current_pid_tgid();
+  ts = bpf_ktime_get_ns();
+
+  e->t = SYS_EXIT_IO_URING_ENTER;
+  e->pid = id >> 32;
+  e->tid = id;
+  e->ts = ts;
+  bpf_get_current_comm(&e->comm, sizeof(e->comm));
 
   bpf_ringbuf_submit(e, 0);
   return 0;
