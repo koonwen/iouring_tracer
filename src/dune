@@ -17,6 +17,11 @@
  (modules trace))
 
 (executable
+ (name trace_rings)
+ (libraries util definitions fxt)
+ (modules trace_rings ring_writer))
+
+(executable
  (name uring_spans)
  (libraries util definitions fxt)
  (modules uring_spans))

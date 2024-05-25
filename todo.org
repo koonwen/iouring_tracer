@@ -945,38 +945,88 @@ I've put that aside
       ANS: Not neccessary because of above.
 
 *** PM
-- [-] Debugging trace results
-  - [ ] Test thomas's workload see if there's a speedup from cutting syscalls.
-  - [ ] Check eio-dump for the statx results to see if perfetto display is the problem
-  - [ ] Try using user data pointer instead of req pointer.
+- [X] Debugging trace results
+  - [X] Check eio-dump for the statx results to see if perfetto display is the problem
+  - [X] Try using user data pointer instead of req pointer.
+    ANS: req pointer is correct
   - [X] Check uring code/Linux version why fstatat is being used
     ANS: Used by readdir
 
+** <2024-05-22 Wed>
+*** AM
+  - [X] Debugging trace
+    - [X] See if there are other trace viewers for Fuchsia
+      ANS: None
+    - [X] Add kiocb to types to get opcode from req pointer
+      ANS: Not worth the effort
+    - [X] Test thomas's workload see if there's a speedup from cutting syscalls.
+
+*** PM
+  - [X] Optimizing uring performance
+    - [X] Use batching
+    - [X] Use SQE polling
+
+** <2024-05-23 Thu>
+  - [ ] Improving tracing
+    - [ ] Fix nested calls (Needs separate tracks)
+
+
+
 * NEXT Meeting
-** TODO <2024-05-16 Thu>
-- [-]  Benchmarks
-  - [X] Update Anil and check what fields are required for the diff
-  - [X] Keep notes for filesystem benchmarking for blogpost
-  - [X] Check out eio repo that creates synthetic fs and tests stat,
-  - [X] Use Hyperfine with warmup for benchmarking (Note Freq scaling / Power)
-  - [X] Do C benchmarks instead of OCaml
-  - [X] Implement uring_batched backend for comparison with sys
-  - [ ] uring_batched is slower, find out with with iouring_tracer
-  - [ ] Better frontend parsing for test params.
+** TODO <2024-05-23 Thu>
+- [ ]  Benchmarks
+  - [ ] Optimizing uring performance
+    - [ ] Use fixed buffers
+  - [ ] Accessing files by path vs FD
+  - [ ] Use linking vs non linking
+  - [ ] Bench hybrid strategy, Using all cores versus some kind of split (in sqpoll mode)
 
-- [-] Debugging trace results
-  - [ ] Test thomas's workload see if there's a speedup from cutting syscalls.
-  - [ ] Check eio-dump for the statx results to see if perfetto display is the problem
-  - [ ] Try using user data pointer instead of req pointer.
-  - [X] Check uring code/Linux version why fstatat is being used
+- [ ] Improving trace visualization
+  - [ ] Understand and write about how uring works (detailing what happens exactly in the kernel)
   - [ ] Uring can have parallel syscalls in flight, figure out how to account for this
+  - [ ] Fix nested calls
+    - [ ] Add support for FXT async/flow events and see how they display in perfetto
+    - [ ] Use separate tracks
+  - [ ] Dropped events
+    - [ ] Sample syscalls instead of tracing everything
 
-- [ ] Improving tracing
-  - [ ] Sample syscalls instead of tracing everything
-  - [ ] Kernel mode sharing
-  - [ ] Work individual programs each with their own ring buffer and
-    handler
 
+  - [ ] eio benchmark http with sqpoll, can check that out.
+  - [ ] Figure out why sqring_wait fails
+
+** IO-uring under the hood
+IO-uring is a subsystem implemented in the Linux kernel that provides
+asynchronous API's to IO.
+
+
+At the heart of it, there are two ring buffers which are shared by the
+kernel and the user application. One ring is called the submission
+queue ring where the user application puts IO requests for the kernel
+to consume. The other is called the completion queue ring which is
+where the kernel puts the results of the requests and is consumed by
+the application.
+
+Between the time the kernel consumes the requests and
+returns the results, io-uring makes various 'smart' decisions on how
+your IO should be handled asynchronously. This is what I will focus on.
+
+
+** Notes:
+The SQ limit is half of the max CQ entries, presumably to prevent
+blocking when the kernel is processing a submission request and the
+user application wants to submit another request.
+
+** Ideas for visualization
+Define separate tracks as Submission ring track and Completion ring
+track? Which means you need to define two kernel objects and link requests appropriately
+
+** BPF ring buffer
+- We could be dropping events not because of there is no space but
+  because of high contention. Ringbuf should be able to support 1Mil ops/s
+- ADd a counter to see exactly how many events we are dropping.
+
+bpf-helpers.h are for kernel programming
+bpf/libbpf.h and those annotated with LIBBPF are exposed to userspace for use
 
 * Backlog:
 ** Tracing analysis

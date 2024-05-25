@@ -6,6 +6,48 @@ module D = Definitions
 
 exception Exit of int
 
+module Write = struct
+  type t = {
+    sqring : Fxt.Write.thread;
+    cqring : W.thread;
+    syscalls : Fxt.Write.thread;
+    fxt : Fxt.Write.t;
+  }
+
+  let submission_event ?args t ~name ~ts ~correlation_id =
+    W.duration_begin t.fxt ?args ~name ~thread:t.sqring ~category:"uring" ~ts;
+    W.flow_begin t.fxt ~correlation_id ?args ~name ~thread:t.sqring
+      ~category:"uring" ~ts;
+    W.duration_end t.fxt ?args ~name ~thread:t.sqring ~category:"uring" ~ts
+
+  let completion_event ~correlation_id ?args t ~name ~ts =
+    W.duration_begin t.fxt ?args ~name ~thread:t.cqring ~category:"uring" ~ts;
+    W.flow_end t.fxt ~correlation_id ?args ~name ~thread:t.cqring
+      ~category:"uring" ~ts;
+    W.duration_end t.fxt ?args ~name ~thread:t.cqring ~category:"uring" ~ts
+
+  let make fxt =
+    let pid = Int64.of_int (Unix.getpid ()) in
+    let t =
+      {
+        sqring = W.{ pid; tid = 0L };
+        cqring = W.{ pid; tid = 1L };
+        syscalls = W.{ pid; tid = 2L };
+        fxt;
+      }
+    in
+    W.kernel_object fxt
+      ~args:[ ("process", `Koid pid) ]
+      ~name:"SQRING" `Thread t.sqring.tid;
+    W.kernel_object fxt
+      ~args:[ ("process", `Koid pid) ]
+      ~name:"CQRING" `Thread t.cqring.tid;
+    W.kernel_object fxt
+      ~args:[ ("process", `Koid pid) ]
+      ~name:"SYSCALLS" `Thread t.syscalls.tid;
+    t
+end
+
 type handler =
   unit Ctypes_static.ptr ->
   unit Ctypes_static.ptr ->
@@ -119,11 +161,14 @@ let event_loop ~bpf_object_path ~program_names handlers fxt =
     | _ -> ()
   done
 
-let event_loop_run ?(tracefile="trace.fxt") ~bpf_object_path ~program_names handlers =
+let event_loop_run ?(tracefile = "trace.fxt") ~bpf_object_path ~program_names
+    handlers =
   Eio_linux.run @@ fun env ->
   Eio.Switch.run (fun sw ->
       let output_file = Eio.Path.( / ) (Eio.Stdenv.cwd env) tracefile in
-      let out = Eio.Path.open_out ~sw ~create:(`Or_truncate 0o644) output_file in
+      let out =
+        Eio.Path.open_out ~sw ~create:(`Or_truncate 0o644) output_file
+      in
       Eio.Buf_write.with_flow out (fun w ->
           let fxt = W.of_writer w in
           try event_loop ~bpf_object_path ~program_names handlers fxt
