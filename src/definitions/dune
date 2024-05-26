@@ -8,7 +8,7 @@
 ; Step 2: Execute OCaml generator in step 1, producing C generator
 
 (rule
- (targets defs_stubs_gen.c uring_ops_stubs_gen.c)
+ (targets uring_stubs_gen.c)
  (deps def_generator.exe)
  (action
   (run %{deps})))
@@ -16,15 +16,8 @@
 ; Step 3: Compile C generator produced in step 2
 
 (rule
- (targets defs_stubs_gen.out)
- (deps defs_stubs_gen.c defs.h)
- (action
-  (bash
-   "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -o %{targets}")))
-
-(rule
- (targets uring_ops_stubs_gen.out)
- (deps uring_ops_stubs_gen.c uring_ops.h)
+ (targets uring_stubs_gen.out)
+ (deps uring_stubs_gen.c uring.h)
  (action
   (bash
    "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -o %{targets}")))
@@ -45,23 +38,14 @@
 (rule
  (mode
   (promote (until-clean)))
- (targets defs.h uring_ops.h)
+ (targets uring.h)
  (action
   (progn
-   (copy ../defs.h defs.h)
-   (copy ../uring_ops.h uring_ops.h))))
+   (copy ../uring.h uring.h))))
 
 (rule
- (targets defs_generated.ml)
- (deps defs_stubs_gen.out defs.h)
- (action
-  (with-stdout-to
-   %{targets}
-   (run %{deps} -ml))))
-
-(rule
- (targets uring_ops_generated.ml)
- (deps uring_ops_stubs_gen.out uring_ops.h)
+ (targets uring_generated.ml)
+ (deps uring_stubs_gen.out uring.h)
  (action
   (with-stdout-to
    %{targets}
@@ -71,5 +55,5 @@
 
 (library
  (name definitions)
- (modules defs_generated uring_ops_generated definitions)
+ (modules uring_generated definitions)
  (libraries ctypes defs))

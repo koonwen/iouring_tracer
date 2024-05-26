@@ -63,7 +63,7 @@ let run handle_event =
 
   (* Read BPF object *)
   let obj =
-    match F.bpf_object__open "uring_ops.bpf.o" with
+    match F.bpf_object__open "uring.bpf.o" with
     | None ->
         Printf.eprintf "Failed to open BPF object\n";
         raise (Exit 1)

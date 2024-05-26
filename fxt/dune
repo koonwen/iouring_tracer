@@ -2,8 +2,3 @@
  (name fxt)
  (libraries eio)
  (modules write))
-
-(executable
- (name test_vis)
- (libraries fxt eio_main eio tracing)
- (modules test_vis))

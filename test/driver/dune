@@ -1,8 +1,0 @@
-(executables
- (names test_prog_err test_bt_err)
- (libraries obpftrace))
-
-; (rule
-;  (alias runtest)
-;  (action
-;   (bash "make -C %{project_root}/test/driver/ test")))

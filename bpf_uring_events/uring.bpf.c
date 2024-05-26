@@ -1,5 +1,5 @@
 #include "vmlinux.h"
-#include "uring_ops.h"
+#include "uring.h"
 #include <bpf/bpf_helpers.h>
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";

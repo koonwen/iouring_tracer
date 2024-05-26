@@ -1,5 +1,3 @@
 (library
  (name defs)
- (preprocess
-  (pps ppx_deriving.show ppx_deriving.enum))
  (libraries ctypes))

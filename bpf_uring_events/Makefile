@@ -8,7 +8,7 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/')
 VMLINUX := vmlinux/$(ARCH)/vmlinux.h
 INCLUDES := -I$(OUTPUT) -I/usr/include/x86_64-linux-gnu/ -I$(dir $(VMLINUX))
 
-APPS = uring_spans trace_uring uring_ops
+APPS = uring
 
 ifeq ($(V),1)
 	Q =
@@ -45,6 +45,9 @@ $(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) $(VMLINUX) | $(OUTPUT)
 	$(Q)$(CLANG) -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH)		      \
 		     $(INCLUDES) -c $(filter %.c,$^) -o $@
 	# $(Q)$(LLVM_STRIP) -g $@
+
+$(VMLINUX):
+	sudo bpftool btf dump file /sys/kernel/btf/vmlinux format c > $(VMLINUX)
 
 # delete failed targets
 .DELETE_ON_ERROR:

@@ -1,6 +1,0 @@
-(install
- (files
-  (glob_files *.bt))
- (section
-  (site
-   (obpftrace bt))))

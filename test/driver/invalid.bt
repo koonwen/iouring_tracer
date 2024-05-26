@@ -1,3 +1,0 @@
-BEGIN {
-    print("Deliberate Syntax error);
-}
