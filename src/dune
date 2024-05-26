@@ -1,18 +1,19 @@
+(executable
+ (public_name trace_uring)
+ (name trace_uring)
+ (libraries util definitions fxt)
+ (modules trace_uring ring_writer))
+
 (library
  (name util)
  (libraries ocaml_libbpf definitions fxt eio_linux)
  (modules util))
 
-(executable
- (name trace_rings)
- (libraries util definitions fxt)
- (modules trace_rings ring_writer))
-
 (rule
  (mode
   (promote (until-clean)))
  (deps
-  (source_tree %{project_root}/bpf_uring_events))
+  (source_tree %{project_root}/bpf))
  (targets
   uring.bpf.o
   uring.h)
@@ -20,10 +21,10 @@
   (no-infer
    (progn
     (chdir
-      %{project_root}/bpf_uring_events
+      %{project_root}/bpf
      (run make))
-    (copy %{project_root}/bpf_uring_events/output/uring.bpf.o uring.bpf.o)
-    (copy# %{project_root}/bpf_uring_events/uring.h uring.h)))))
+    (copy %{project_root}/bpf/output/uring.bpf.o uring.bpf.o)
+    (copy# %{project_root}/bpf/uring.h uring.h)))))
 
 ; (rule
 ;  (alias bpf)
