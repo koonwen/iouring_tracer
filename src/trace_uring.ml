@@ -166,13 +166,12 @@ let run handle_event =
   at_exit (fun () -> F.ring_buffer__free rb);
 
   while !exitting do
-    let err = F.ring_buffer__poll rb 100 in
-    match err with
+    match F.ring_buffer__consume rb with
+    | i when i >= 0 -> ()(* Printf.printf "Consumed %d\n" i *)
     | e when e = Sys.sighup -> raise (Exit 0)
-    | e when e < 0 ->
+    | e ->
         Printf.eprintf "Error polling ring buffer, %d\n" e;
         raise (Exit 1)
-    | _ -> ()
   done
 
 let () =
