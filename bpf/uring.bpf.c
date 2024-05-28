@@ -37,17 +37,8 @@ long *value;
 /*   return 0; */
 /* } */
 
-SEC("tp/io_uring/io_uring_submit_sqe")
-int handle_submit(struct trace_event_raw_io_uring_submit_sqe *ctx) {
-  struct event *e;
-  struct io_uring_submit_sqe *extra;
-  unsigned op_str_off;
-  long *value;
-
-  u64 id, ts;
-  /* reserve sample from BPF ringbuf */
-  e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
-  if (!e) {
+static inline void __incr_counter(void) {
+    long *value;
     value = bpf_map_lookup_elem(&global_counter, &global_counter_index);
     if (value == NULL) {
       bpf_printk("Error got NULL");
@@ -55,6 +46,19 @@ int handle_submit(struct trace_event_raw_io_uring_submit_sqe *ctx) {
     };
     v = *value + 1;
     bpf_map_update_elem(&global_counter, &global_counter_index, &v, 0);
+}
+
+SEC("tp/io_uring/io_uring_submit_sqe")
+int handle_submit(struct trace_event_raw_io_uring_submit_sqe *ctx) {
+  struct event *e;
+  struct io_uring_submit_sqe *extra;
+  unsigned op_str_off;
+
+  u64 id, ts;
+  /* reserve sample from BPF ringbuf */
+  e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
+  if (!e) {
+    __incr_counter();
     return 1;
   }
 
@@ -95,13 +99,7 @@ int handle_complete(struct trace_event_raw_io_uring_complete *ctx) {
   u64 id, ts;
   /* reserve sample from BPF ringbuf */
   if (!e) {
-    value = bpf_map_lookup_elem(&global_counter, &global_counter_index);
-    if (value == NULL) {
-      bpf_printk("Error got NULL");
-      value = &v;
-    };
-    v = *value + 1;
-    bpf_map_update_elem(&global_counter, &global_counter_index, &v, 0);
+    __incr_counter();
     return 1;
   }
 
@@ -135,13 +133,7 @@ int handle_sys_enter_io_uring_enter(struct trace_event_raw_sys_enter *ctx) {
   e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
 
   if (!e) {
-    value = bpf_map_lookup_elem(&global_counter, &global_counter_index);
-    if (value == NULL) {
-      bpf_printk("Error got NULL");
-      value = &v;
-    };
-    v = *value + 1;
-    bpf_map_update_elem(&global_counter, &global_counter_index, &v, 0);
+    __incr_counter();
     return 1;
   }
 
@@ -166,13 +158,7 @@ int handle_sys_exit_io_uring_enter(struct trace_event_raw_sys_enter *ctx) {
   /* reserve sample from BPF ringbuf */
   e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
   if (!e) {
-    value = bpf_map_lookup_elem(&global_counter, &global_counter_index);
-    if (value == NULL) {
-      bpf_printk("Error got NULL");
-      value = &v;
-    };
-    v = *value + 1;
-    bpf_map_update_elem(&global_counter, &global_counter_index, &v, 0);
+    __incr_counter();
     return 1;
   }
 

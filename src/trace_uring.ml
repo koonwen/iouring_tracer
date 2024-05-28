@@ -4,6 +4,8 @@ module T = Libbpf.Types
 module W = Fxt.Write
 module D = Definitions.Uring_ops
 
+let cb_processed = ref 0
+
 exception Exit of int
 
 (* Describe event handler *)
@@ -182,4 +184,4 @@ let () =
       Eio.Buf_write.with_flow out (fun w ->
           let fxt = W.of_writer w in
           let t = Ring_writer.make fxt in
-          try run (handle_event t) with Exit i -> Printf.eprintf "exit %d%!" i))
+          try run (handle_event t) with Exit i -> Printf.eprintf "exit %d\n" i))

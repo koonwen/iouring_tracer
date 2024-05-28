@@ -1,87 +1,107 @@
 # iouring_tracer
-Tracing tool for Linux IO-uring leveraging
-[`bpftrace`](https://github.com/iovisor/bpftrace) to generate a trace
-log.
+A tracing tool to help visualize how your workload performs under
+Linux's asynchronous IO-uring runtime. This tracer leverages eBPF
+probes ([`ocaml_libbpf`](https://github.com/koonwen/ocaml_libbpf)) to
+extract information from the kernel. Traces are generated in fuchsia
+format to be displayed on [Perfetto](https://ui.perfetto.dev/).
 
-# TODO
-- [ ] Find io-uring programs that have contention
-- [ ] Attach probes trace data to `Runtime_events`
-- [ ] Write bpftrace programs that dump meaningful io-uring probe trace information
-- [ ] TBC: OCaml API's for writing and generating custom eBPF programs.
+### Motivation
+The current best way to gain some observability into io-uring is to
+use `perf` to sample your program. Whilst this works, it can be hard
+to get a mental picture of how your program flows since perf reports a
+linear history of the tracepoints it managed to collect. Our tool on
+the other hand, tries to trace requests as they go through io-uring
+and provide an idiomatic way to understand your IO-requests as they go
+through the kernel. Our tracer also uses eBPF technology to hook into
+the kernel, unlike perf it is much more versatile to be extended to
+hook into arbritrary points in the kernel to support future
+enhancements to tracing.
 
-# Features
-- [ ] `obpf` is a convenient executable that loads the tracer and
-      spawns the target program program
-- [ ] `obpftrace` library for directly attaching the tracer to
-      programs that can't be run through the binary.
+  Features:
+  - Path of IO requests from submission to completion
+  - Syscall tracks
+  - IO-worker tracks
+  - Multiple rings support
 
-# Install
-``` shell
-git clone git@github.com:koonwen/iouring_tracer.git
-cd iouring_tracer
-make switch
-```
+## Path of IO request from submission to completion
+The io-uring runtime makes several decisions on how your request
+should be processed asynchronously. In particular, there are 3
+pathways that happen in the `io_issue_sqe` kernel call:
 
-# Usage
-``` shell
-obpf <path to program>
-```
+1. Direct Submission (fast path): If the operation can be started
+   immediately and is likely to complete quickly (and asynchronously),
+   `io_issue_sqe` will directly submit the I/O operation to the device
+   driver or appropriate subsystem. This is done in a way that does
+   not block the submitting process.
 
-Or as a library
+2. Deferred Execution (slow path): In some cases, operations may not
+   be able to start immediately or require more complex
+   setup. `io_issue_sqe` can queue these operations internally within
+   io_uring or hand them off to other parts of the kernel that will
+   handle them asynchronously. This deferral is crucial for
+   maintaining the non-blocking nature of io_uring. [Goes to the workqueue?]
 
-``` ocaml
-let main () = <program logic>
-let () = Obpftrace.Driver.kprobes main
-```
-You can find trace log in `trace.txt`
+3. Arm a poll?
 
-# Sample trace
+This feature allows users to visualize the path a request takes in the
+kernel. The lifetime of a request starts from a submission into the
+SQring to a completion on the CQring. When you click on a request,
+perfetto will draw arrows to show the path of an request. It also
+shows linked requests to show the ordering expected by the program and
+also ideally when the request is finally reaped by the users program.
 
-``` shell
-Attaching 25 probes...
-[17:37:53]: Tracing IO_uring kprobes...
-[17:37:53]: kprobe:io_uring_setup eio_kprobes.exe
-[17:37:53]: kprobe:io_uring_alloc_task_context eio_kprobes.exe
-[17:37:53]: kprobe:io_uring_mmu_get_unmapped_area eio_kprobes.exe
-[17:37:53]: kprobe:io_uring_validate_mmap_request.isra.0 eio_kprobes.exe
-[17:37:53]: kprobe:io_uring_mmap eio_kprobes.exe
-[17:37:53]: kprobe:io_uring_validate_mmap_request.isra.0 eio_kprobes.exe
-[17:37:53]: kprobe:io_uring_mmu_get_unmapped_area eio_kprobes.exe
-[17:37:53]: kprobe:io_uring_validate_mmap_request.isra.0 eio_kprobes.exe
-[17:37:53]: kprobe:io_uring_mmap eio_kprobes.exe
-[17:37:53]: kprobe:io_uring_validate_mmap_request.isra.0 eio_kprobes.exe
-[17:37:56]: kprobe:io_uring_get_socket Xwayland
-[17:37:56]: kprobe:io_uring_get_socket Xwayland
-[17:37:56]: kprobe:io_uring_get_socket Xwayland
-[17:37:56]: kprobe:io_uring_get_socket gnome-shell
-[17:37:56]: kprobe:io_uring_get_socket gnome-shell
-[17:37:56]: kprobe:io_uring_get_socket gnome-shell
-[17:37:59]: kprobe:io_uring_release eio_kprobes.exe
-[17:37:59]: kprobe:io_uring_try_cancel_requests kworker/u16:9
-[17:37:59]: kprobe:io_uring_del_tctx_node eio_kprobes.exe
-[17:38:01]: kprobe:io_uring_unreg_ringfd eio_kprobes.exe
-[17:38:01]: kprobe:io_uring_cancel_generic eio_kprobes.exe
-[17:38:01]: kprobe:io_uring_drop_tctx_refs eio_kprobes.exe
-[17:38:01]: kprobe:io_uring_clean_tctx eio_kprobes.exe
+## Syscall track
+From the users perspective, io-uring is a performance win because
+users can reduce the number of syscalls their program uses and
+thereby - the overhead of context switch from user to kernel
+modes. One way to see if your program is really benefitting from this
+is to visualize the syscalls made.
 
+You could use `strace` tool to get the numbers but that adds overhead
+to your running program. This tool shows syscalls in the form of
+timeslices so that you can see how much time your code spends from the
+point of entry to exit of your syscall. This may provide more
+information on how to tune your program.
 
-@reads[kprobe:io_uring_alloc_task_context]: 1
-@reads[kprobe:io_uring_try_cancel_requests]: 1
-@reads[kprobe:io_uring_clean_tctx]: 1
-@reads[kprobe:io_uring_cancel_generic]: 1
-@reads[kprobe:io_uring_unreg_ringfd]: 1
-@reads[kprobe:io_uring_release]: 1
-@reads[kprobe:io_uring_del_tctx_node]: 1
-@reads[kprobe:io_uring_drop_tctx_refs]: 1
-@reads[kprobe:io_uring_setup]: 1
-@reads[kprobe:io_uring_mmu_get_unmapped_area]: 2
-@reads[kprobe:io_uring_mmap]: 2
-@reads[kprobe:io_uring_validate_mmap_request.isra.0]: 4
-@reads[kprobe:io_uring_get_socket]: 6
-```
+## IO-worker tracks
+io-uring internally uses something like a kernel workqueue to run your
+IO request asynchronously. It's not obvious how many workers are
+involved in processing the request and what worker might be blocked
+for a long time. This tool shows an io-worker as a track and the uring
+instance it is associated to. The io-worker display's the timeslice of
+the IO task that it ran.
 
-# Tracing with Olly
-iouring_tracer comes with a set of custom events that can be hooked
-into the runtime events ring buffer. An example visualization using
-perfetto gives
-![Perfetto trace](test/olly/test_eio_1_perfetto.png)
+## Multiple uring instance support
+Programs may intentionally use multiple rings. This tool supports
+multiple visualization of multiple rings and organizes them in a
+idiomatic way.
+
+# Current support
+  -  Path of IO request from submission to completion
+    - [X] Submission & Completion Ring Tracks
+    - [X] Trace flow to completion
+    - [ ] Trace flow when event flags set IO-uring SQE link to see user enforced ordering of events.
+    - [ ] We probably want to trace when the user picks up the completion so that we can see the ring filling/freeing up
+
+      io_uring_submit tracepoint is part of kernel io_uring:io_submit_sqe, this happens after io_uring_enter
+      io_uring_complete tracepoint happens in kernel io_uring:io_fill_cqe_aux
+
+  - [-] Syscall track
+    - [ ] io_uring_setup
+    - [ ] io_uring_register
+    - [X] io_uring_enter
+    - [ ] How to view context switches?
+
+  - [ ] IO-worker tracks
+    - [ ] Show number of workers and their work associated to rings
+    - [ ] Connect to flows
+
+  - [ ] Multiple uring instance support
+	- [ ] Add each uring instance as a "process" track
+	- [ ] Add associated tracks under "threads" track
+
+  - [ ] Suggestions
+    - [ ] Track for Fixed buffer?
+    - [ ] Find out if Uring can have parallel syscalls in flight, figure
+    out how to account for this
+    - [ ] Implement some kind of sampling of syscalls instead of tracing everything
