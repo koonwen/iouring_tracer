@@ -79,7 +79,11 @@ idiomatic way.
 # Current support
   -  Path of IO request from submission to completion
     - [X] Submission & Completion Ring Tracks
-    - [X] Trace flow to completion
+    - [ ] Trace flow to completion
+	  - [X] io_uring_submit
+	  - [ ] io_uring_queue_async_work
+	  - [ ] io_uring_poll_arm
+	  - [X] io_uring_complete
     - [ ] Trace flow when event flags set IO-uring SQE link to see user enforced ordering of events.
     - [ ] We probably want to trace when the user picks up the completion so that we can see the ring filling/freeing up
 
@@ -105,3 +109,17 @@ idiomatic way.
     - [ ] Find out if Uring can have parallel syscalls in flight, figure
     out how to account for this
     - [ ] Implement some kind of sampling of syscalls instead of tracing everything
+
+# Discussion
+Tracing vs Profiling
+- The opaque and asynchronous nature of the uring runtime motivates
+  tracing to give a picture of a programs execution to visualize where
+  bottlenecks could be.
+- Currently, it seems that the only way to get data from bpf programs
+  is through a shared ring buffer, this is prone to overflows and lost
+  events for high-throughput workloads.
+- One solution would be to do sampling instead of full-blown tracing
+  but this is fairly involved as we will need our program to implement
+  some kind of rate limitting of requests so that flows can be
+  properly recorded.
+  - Per event ring buffer and global hashmap to filter seen req?

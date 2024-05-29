@@ -2,9 +2,7 @@ open Ocaml_libbpf
 module F = Libbpf.Functions
 module T = Libbpf.Types
 module W = Fxt.Write
-module D = Definitions.Uring_ops
-
-let cb_processed = ref 0
+module D = Definitions
 
 exception Exit of int
 
@@ -13,6 +11,7 @@ let handle_event (wt : Ring_writer.t) _ctx data _size =
   let open Ctypes in
   let event = !@(from_voidp D.struct_event data) in
   let ts = getf event D.ts |> Unsigned.UInt64.to_int64 in
+  let u = getf event D.ufield in
   (match getf event D.t with
   | D.SYS_ENTER_IO_URING_ENTER ->
       W.duration_begin wt.fxt ~name:"IO_URING_ENTER" ~thread:wt.syscalls
@@ -21,35 +20,42 @@ let handle_event (wt : Ring_writer.t) _ctx data _size =
       W.duration_end wt.fxt ~name:"IO_URING_ENTER" ~thread:wt.syscalls
         ~category:"uring" ~ts
   | D.IO_URING_SUBMIT_SQE ->
-      let module S = D.Struct_io_uring_submit_sqe in
-      let u = getf event D.ufield in
-      let t = getf u D.io_uring_submit_sqe in
-      let req = getf t S.req |> raw_address_of_ptr |> Int64.of_nativeint in
-      let opcode = getf t S.opcode in
-      let flags = getf t S.flags in
-      let force_nonblock = getf t S.force_nonblock in
-      let sq_thread = getf t S.sq_thread in
-      let op_str = getf t S.op_str |> Definitions.char_array_as_string in
-      Ring_writer.submission_event wt ~name:op_str ~ts ~correlation_id:req
+      let t =
+        getf u D.io_uring_submit_sqe |> D.Struct_io_uring_submit_sqe.unload
+      in
+      Ring_writer.submission_event wt ~name:t.op_str ~ts
+        ~correlation_id:t.req_ptr
         ~args:
           [
-            ("req", `Pointer req);
-            ("opcode", `Int64 (Unsigned.UInt8.to_int64 opcode));
-            ("flags", `Int64 (Unsigned.UInt32.to_int64 flags));
-            ("force_nonblock", `String (Bool.to_string force_nonblock));
-            ("sq_thread", `String (Bool.to_string sq_thread));
+            ("req", `Pointer t.req_ptr);
+            ("opcode", `Int64 (Int64.of_int t.opcode));
+            ("flags", `Int64 (Int64.of_int32 t.flags));
+            ("force_nonblock", `String (Bool.to_string t.force_nonblock));
+            ("sq_thread", `String (Bool.to_string t.sq_thread));
+          ]
+  | D.IO_URING_QUEUE_ASYNC_WORK ->
+      let t =
+        getf u D.io_uring_queue_async_work
+        |> D.Struct_io_uring_queue_async_work.unload
+      in
+      Ring_writer.async_work_event wt ~name:"queue_async_work" ~ts
+        ~correlation_id:t.req_ptr
+        ~args:
+          [
+            ("opcode", `Int64 (Int64.of_int t.opcode));
+            ("flags", `Int64 (Int64.of_int32 t.flags));
+            ("work_ptr", `Pointer t.work_ptr);
+            ("op_str", `String t.op_str);
           ]
   | D.IO_URING_COMPLETE ->
-      let module S = D.Struct_io_uring_complete in
-      let u = getf event D.ufield in
-      let t = getf u D.io_uring_complete in
-      let req = getf t S.req |> raw_address_of_ptr |> Int64.of_nativeint in
-      let res = getf t S.res |> Int64.of_int in
-      let cflags = getf t S.cflags |> Unsigned.UInt32.to_int64 in
-      Ring_writer.completion_event wt ~name:"complete" ~ts ~correlation_id:req
+      let t = getf u D.io_uring_complete |> D.Struct_io_uring_complete.unload in
+      Ring_writer.completion_event wt ~name:"complete" ~ts
+        ~correlation_id:t.req_ptr
         ~args:
           [
-            ("req", `Pointer req); ("res", `Int64 res); ("cflags", `Int64 cflags);
+            ("req", `Pointer t.req_ptr);
+            ("res", `Int64 (Int64.of_int t.res));
+            ("cflags", `Int64 (Int64.of_int32 t.cflags));
           ]);
   0
 
@@ -82,6 +88,7 @@ let run handle_event =
   let program_names =
     [
       "handle_submit";
+      "handle_queue_async_work";
       "handle_complete";
       "handle_sys_enter_io_uring_enter";
       "handle_sys_exit_io_uring_enter";
@@ -126,24 +133,28 @@ let run handle_event =
   let rb_fd = F.bpf_map__fd map in
 
   at_exit (fun () ->
-      match F.bpf_object__find_map_by_name obj "global_counter" with
-      | None -> Printf.eprintf "Failed to find global_counter map"
-      | Some global_counter ->
+      match F.bpf_object__find_map_by_name obj "globals" with
+      | None -> Printf.eprintf "Failed to find globals map"
+      | Some counter -> (
           let open Ctypes in
-          let key = Ctypes.(allocate int 0) in
           let sz_key = Ctypes.(sizeof int |> Unsigned.Size_t.of_int) in
-          let value = Ctypes.(allocate long Signed.Long.zero) in
           let sz_value = Ctypes.(sizeof long |> Unsigned.Size_t.of_int) in
+          let key = Ctypes.(allocate int 0) in
+          let value_cnt = Ctypes.(allocate long Signed.Long.zero) in
           let flags = Unsigned.UInt64.zero in
-          let res =
-            F.bpf_map__lookup_elem global_counter (to_voidp key) sz_key
-              (to_voidp value) sz_value flags
+          let counter =
+            F.bpf_map__lookup_elem counter (to_voidp key) sz_key
+              (to_voidp value_cnt) sz_value flags
           in
-          if res <> 0 then Printf.eprintf "Failed to lookup element got %d\n" res
+          if counter <> 0 then
+            Printf.eprintf "Failed to lookup element got %d\n" counter
           else
-            Printf.printf
-              "Failed to reserve space in Ringbuf, Dropped events %s\n"
-              (Ctypes_value_printing.string_of long !@value));
+            match !@value_cnt with
+            | i when i = Signed.Long.zero -> ()
+            | i ->
+                Printf.eprintf
+                  "Failed to reserve space in Ringbuf, Dropped events %s\n"
+                  (Ctypes_value_printing.string_of long i)));
 
   let handle_event =
     Ctypes.(
@@ -167,14 +178,27 @@ let run handle_event =
 
   at_exit (fun () -> F.ring_buffer__free rb);
 
+  let cb = ref 0 in
+
+  at_exit (fun () -> Printf.printf "Consumed %d events\n" !cb);
+
   while !exitting do
-    match F.ring_buffer__consume rb with
-    | i when i >= 0 -> ()(* Printf.printf "Consumed %d\n" i *)
+    let err = F.ring_buffer__poll rb 100 in
+    match err with
     | e when e = Sys.sighup -> raise (Exit 0)
-    | e ->
+    | e when e < 0 ->
         Printf.eprintf "Error polling ring buffer, %d\n" e;
         raise (Exit 1)
-  done
+    | i -> cb := !cb + i
+    (* match F.ring_buffer__consume rb with *)
+    (* | i when i >= 0 -> cb := !cb + i *)
+    (* | e when e = Sys.sighup -> raise (Exit 0) *)
+    (* | e -> *)
+    (*     Printf.eprintf "Error polling ring buffer, %d\n" e; *)
+    (*     raise (Exit 1) *)
+  done;
+
+  raise (Exit 0)
 
 let () =
   Eio_linux.run @@ fun env ->
@@ -184,4 +208,5 @@ let () =
       Eio.Buf_write.with_flow out (fun w ->
           let fxt = W.of_writer w in
           let t = Ring_writer.make fxt in
-          try run (handle_event t) with Exit i -> Printf.eprintf "exit %d\n" i))
+          try run (handle_event t)
+          with Exit i -> Printf.printf "Exit %d\n%!" i))
