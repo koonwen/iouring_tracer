@@ -7,11 +7,20 @@
 #define MAX_OP_STR_LEN 127
 
 enum tracepoint_t {
+  IO_URING_CREATE,
   IO_URING_SUBMIT_SQE,
   IO_URING_QUEUE_ASYNC_WORK,
   IO_URING_COMPLETE,
   SYS_ENTER_IO_URING_ENTER,
   SYS_EXIT_IO_URING_ENTER
+};
+
+struct io_uring_create {
+  int fd;
+  void *ctx;
+  unsigned long sq_entries;
+  unsigned long cq_entries;
+  unsigned long flags;
 };
 
 struct io_uring_submit_sqe {
@@ -63,9 +72,10 @@ struct event {
   unsigned long long ts;
   char comm[TASK_COMM_LEN];
   union extra {
+    struct io_uring_create io_uring_create;
     struct io_uring_complete io_uring_complete;
-    struct io_uring_submit_sqe io_uring_submit_sqe;
     struct io_uring_queue_async_work io_uring_queue_async_work;
+    struct io_uring_submit_sqe io_uring_submit_sqe;
   } extra;
 };
 

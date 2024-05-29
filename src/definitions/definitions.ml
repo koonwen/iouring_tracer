@@ -13,11 +13,38 @@ let char_array_as_string a =
 
 include Defs.Uring.Bindings (Uring_generated)
 
+module Struct_io_uring_create = struct
+  type t = {
+    fd : int;
+    ctx_ptr : int64;
+    sq_entries : int32;
+    cq_entries : int32;
+    flags : int32;
+  }
+
+  let t : t structure typ = structure "io_uring_create"
+  let ( -: ) ty label = field t label ty
+  let fd = int -: "fd"
+  let ctx = ptr void -: "ctx"
+  let sq_entries = uint32_t -: "sq_entries"
+  let cq_entries = uint32_t -: "cq_entries"
+  let flags = uint32_t -: "flags"
+  let _ = seal t
+
+  let unload (t : t structure) =
+    let fd = getf t fd in
+    let ctx_ptr = getf t ctx |> raw_address_of_ptr |> Int64.of_nativeint in
+    let cq_entries = getf t cq_entries |> Unsigned.UInt32.to_int32 in
+    let sq_entries = getf t sq_entries |> Unsigned.UInt32.to_int32 in
+    let flags = getf t flags |> Unsigned.UInt32.to_int32 in
+    { fd; ctx_ptr; sq_entries; cq_entries; flags }
+end
+
 module Struct_io_uring_submit_sqe = struct
   type t = {
     req_ptr : int64;
     opcode : int;
-    flags : int32;
+    flags : int;
     force_nonblock : bool;
     sq_thread : bool;
     op_str : string;
@@ -25,9 +52,9 @@ module Struct_io_uring_submit_sqe = struct
 
   let t : t structure typ = structure "io_uring_submit_sqe"
   let ( -: ) ty label = field t label ty
-  let req = ptr void -: "req" [@@warning "-32"]
+  let req = ptr void -: "req"
   let opcode = uint8_t -: "opcode"
-  let flags = uint32_t -: "flags"
+  let flags = ulong -: "flags"
   let force_nonblock = bool -: "force_nonblock"
   let sq_thread = bool -: "sq_thread"
   let op_str = array max_op_str_len char -: "op_str"
@@ -36,7 +63,7 @@ module Struct_io_uring_submit_sqe = struct
   let unload (t : t structure) =
     let req_ptr = getf t req |> raw_address_of_ptr |> Int64.of_nativeint in
     let opcode = getf t opcode |> Unsigned.UInt8.to_int in
-    let flags = getf t flags |> Unsigned.UInt32.to_int32 in
+    let flags = getf t flags |> Unsigned.ULong.to_int in
     let force_nonblock = getf t force_nonblock in
     let sq_thread = getf t sq_thread in
     let op_str = getf t op_str |> char_array_as_string in
@@ -97,6 +124,7 @@ let tid = int -: "tid"
 let ts = uint64_t -: "ts"
 let comm = array task_comm_len char -: "comm"
 let extra : [ `extra ] union typ = union "extra"
+let io_uring_create = field extra "io_uring_create" Struct_io_uring_create.t
 
 let io_uring_submit_sqe =
   field extra "io_uring_submit_sqe" Struct_io_uring_submit_sqe.t

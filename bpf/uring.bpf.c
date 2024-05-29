@@ -33,7 +33,6 @@ static void __incr_counter(void) {
   bpf_map_update_elem(&globals, &counter_index, value, 0);
 }
 
-/* Figure out how to use this static functions */
 static struct event* __init_event(enum tracepoint_t t) {
   struct event* e;
   u64 id;
@@ -50,7 +49,29 @@ static struct event* __init_event(enum tracepoint_t t) {
   e->tid = id;
   e->ts = bpf_ktime_get_ns();
   bpf_get_current_comm(&e->comm, sizeof(e->comm));
+
+  bpf_printk("(%d) %d:%d", t, e->pid, e->tid);
+
   return e;
+}
+
+SEC("tp/io_uring/io_uring_create")
+int handle_create(struct trace_event_raw_io_uring_create *ctx) {
+  struct event *e;
+  struct io_uring_create *extra;
+
+  e = __init_event(IO_URING_SUBMIT_SQE);
+  if (e == NULL) return 1;
+
+  extra = &(e->extra.io_uring_create);
+  extra->fd = ctx->fd;
+  extra->ctx = ctx->ctx;
+  extra->sq_entries = ctx->sq_entries;
+  extra->cq_entries = ctx->cq_entries;
+  extra->flags = ctx->flags;
+
+  bpf_ringbuf_submit(e, 0);
+  return 0;
 }
 
 SEC("tp/io_uring/io_uring_submit_sqe")
@@ -91,7 +112,7 @@ int handle_queue_async_work(struct trace_event_raw_io_uring_queue_async_work *ct
   extra->opcode = ctx->opcode;
   extra->flags = ctx->flags;
   extra->work = ctx->work;
-    op_str_off = ctx->__data_loc_op_str & 0xFFFF;
+  op_str_off = ctx->__data_loc_op_str & 0xFFFF;
   bpf_probe_read_str(&(extra->op_str), sizeof(extra->op_str),
                      (void *)ctx + op_str_off);
 
