@@ -73,7 +73,7 @@ let handle_event (rw : Ring_writer.t) _ctx data _size =
             ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
             ("req", `Pointer req_ptr);
             ("res", `Int64 (Int64.of_int t.res));
-            ("cflags", `Int64 (Int64.of_int32 t.cflags));
+            ("cflags", `Int64 (Int64.of_int t.cflags));
           ]
   | D.IO_URING_CQRING_WAIT ->
       let t =
@@ -86,7 +86,8 @@ let handle_event (rw : Ring_writer.t) _ctx data _size =
           [
             ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
             ("min_events", `Int64 (Int64.of_int t.min_events));
-          ]);
+          ]
+  | _ -> ());
   0
 
 let run handle_event =
