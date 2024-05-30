@@ -10,6 +10,7 @@ enum tracepoint_t {
   IO_URING_SUBMIT_SQE,
   IO_URING_QUEUE_ASYNC_WORK,
   IO_URING_COMPLETE,
+  IO_URING_CQRING_WAIT,
   SYS_ENTER_IO_URING_ENTER,
   SYS_EXIT_IO_URING_ENTER
 };
@@ -34,16 +35,6 @@ struct io_uring_submit_sqe {
   char op_str[MAX_OP_STR_LEN];
 };
 
-struct io_uring_complete {
-  void *ctx;
-  void *req;
-  /* unsigned long long user_data; */
-  int res;
-  unsigned int cflags;
-  /* unsigned long long extra1; */
-  /* unsigned long long extra2; */
-};
-
 struct io_uring_queue_async_work {
   void *ctx;
   void *req;
@@ -54,6 +45,21 @@ struct io_uring_queue_async_work {
   /* int rw; */
   /* unsigned long __data_loc_op_str; */
   char op_str [MAX_OP_STR_LEN];
+};
+
+struct io_uring_complete {
+  void *ctx;
+  void *req;
+  /* unsigned long long user_data; */
+  int res;
+  unsigned int cflags;
+  /* unsigned long long extra1; */
+  /* unsigned long long extra2; */
+};
+
+struct io_uring_cqring_wait {
+  void *ctx;
+  int min_events;
 };
 
 /* struct sys_enter_io_uring_enter { */
@@ -72,9 +78,10 @@ struct event {
   char comm[TASK_COMM_LEN];
   union extra {
     struct io_uring_create io_uring_create;
-    struct io_uring_complete io_uring_complete;
-    struct io_uring_queue_async_work io_uring_queue_async_work;
     struct io_uring_submit_sqe io_uring_submit_sqe;
+    struct io_uring_queue_async_work io_uring_queue_async_work;
+    struct io_uring_cqring_wait io_uring_cqring_wait;
+    struct io_uring_complete io_uring_complete;
   } extra;
 };
 

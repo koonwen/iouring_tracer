@@ -127,6 +127,21 @@ module Struct_io_uring_complete = struct
     { ctx_ptr; req_ptr; res; cflags }
 end
 
+module Struct_io_uring_cqring_wait = struct
+  type t = { ctx_ptr : nativeint; min_events : int }
+
+  let t : t structure typ = structure "io_uring_cqring_wait"
+  let ( -: ) ty label = field t label ty
+  let ctx = ptr void -: "ctx"
+  let min_events = int -: "min_events"
+  let _ = seal t
+
+  let unload (t : t structure) =
+    let ctx_ptr = getf t ctx |> raw_address_of_ptr in
+    let min_events = getf t min_events in
+    { ctx_ptr; min_events }
+end
+
 type event
 
 let struct_event : event structure typ = structure "event"
@@ -142,11 +157,14 @@ let io_uring_create = field extra "io_uring_create" Struct_io_uring_create.t
 let io_uring_submit_sqe =
   field extra "io_uring_submit_sqe" Struct_io_uring_submit_sqe.t
 
+let io_uring_queue_async_work =
+  field extra "io_uring_queue_async_work" Struct_io_uring_queue_async_work.t
+
 let io_uring_complete =
   field extra "io_uring_complete" Struct_io_uring_complete.t
 
-let io_uring_queue_async_work =
-  field extra "io_uring_queue_async_work" Struct_io_uring_queue_async_work.t
+let io_uring_cqring_wait =
+  field extra "io_uring_cqring_wait" Struct_io_uring_cqring_wait.t
 
 let () = seal extra
 let ufield = field struct_event "" extra

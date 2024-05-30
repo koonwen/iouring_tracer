@@ -140,6 +140,22 @@ int handle_complete(struct trace_event_raw_io_uring_complete *ctx) {
   return 0;
 }
 
+SEC("tp/io_uring/io_uring_cqring_wait")
+int handle_cqring_wait(struct trace_event_raw_io_uring_cqring_wait *ctx) {
+  struct event *e;
+  struct io_uring_cqring_wait *extra;
+
+  e = __init_event(IO_URING_CQRING_WAIT);
+  if (e == NULL) return 1;
+
+  extra = &(e->extra.io_uring_cqring_wait);
+  extra->ctx = ctx->ctx;
+  extra->min_events = ctx->min_events;
+
+  bpf_ringbuf_submit(e, 0);
+  return 0;
+}
+
 SEC("tp/syscalls/sys_enter_io_uring_enter")
 int handle_sys_enter_io_uring_enter(struct trace_event_raw_sys_enter *ctx) {
   struct event *e;

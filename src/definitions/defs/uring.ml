@@ -8,6 +8,7 @@ module Bindings (T : Ctypes.TYPE) = struct
   and io_uring_submit_sqe = constant "IO_URING_SUBMIT_SQE" int64_t
   and io_uring_queue_async_work = constant "IO_URING_QUEUE_ASYNC_WORK" int64_t
   and io_uring_complete = constant "IO_URING_COMPLETE" int64_t
+  and io_uring_cqring_wait = constant "IO_URING_CQRING_WAIT" int64_t
   and sys_enter_io_uring_enter = constant "SYS_ENTER_IO_URING_ENTER" int64_t
   and sys_exit_io_uring_enter = constant "SYS_EXIT_IO_URING_ENTER" int64_t
 
@@ -16,6 +17,7 @@ module Bindings (T : Ctypes.TYPE) = struct
     | IO_URING_SUBMIT_SQE
     | IO_URING_QUEUE_ASYNC_WORK
     | IO_URING_COMPLETE
+    | IO_URING_CQRING_WAIT
     | SYS_ENTER_IO_URING_ENTER
     | SYS_EXIT_IO_URING_ENTER
 
@@ -26,6 +28,7 @@ module Bindings (T : Ctypes.TYPE) = struct
         (IO_URING_SUBMIT_SQE, io_uring_submit_sqe);
         (IO_URING_QUEUE_ASYNC_WORK, io_uring_queue_async_work);
         (IO_URING_COMPLETE, io_uring_complete);
+        (IO_URING_CQRING_WAIT, io_uring_cqring_wait);
         (SYS_ENTER_IO_URING_ENTER, sys_enter_io_uring_enter);
         (SYS_EXIT_IO_URING_ENTER, sys_exit_io_uring_enter);
       ]
