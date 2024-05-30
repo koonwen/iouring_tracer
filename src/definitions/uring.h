@@ -24,7 +24,7 @@ struct io_uring_create {
 };
 
 struct io_uring_submit_sqe {
-  /* void *ctx; */
+  void *ctx;
   void *req;
   /* unsigned long long user_data; */
   unsigned char opcode;
@@ -36,7 +36,7 @@ struct io_uring_submit_sqe {
 };
 
 struct io_uring_complete {
-  /* void *ctx; */
+  void *ctx;
   void *req;
   /* unsigned long long user_data; */
   int res;
@@ -46,7 +46,7 @@ struct io_uring_complete {
 };
 
 struct io_uring_queue_async_work {
-  /* void *ctx; */
+  void *ctx;
   void *req;
   /* unsigned long long user_data; */
   unsigned char opcode;

@@ -50,7 +50,7 @@ static struct event* __init_event(enum tracepoint_t t) {
   e->ts = bpf_ktime_get_ns();
   bpf_get_current_comm(&e->comm, sizeof(e->comm));
 
-  bpf_printk("(%d) %d:%d", t, e->pid, e->tid);
+  /* bpf_printk("(%d) %d:%d", t, e->pid, e->tid); */
 
   return e;
 }
@@ -60,7 +60,7 @@ int handle_create(struct trace_event_raw_io_uring_create *ctx) {
   struct event *e;
   struct io_uring_create *extra;
 
-  e = __init_event(IO_URING_SUBMIT_SQE);
+  e = __init_event(IO_URING_CREATE);
   if (e == NULL) return 1;
 
   extra = &(e->extra.io_uring_create);
@@ -78,12 +78,14 @@ SEC("tp/io_uring/io_uring_submit_sqe")
 int handle_submit(struct trace_event_raw_io_uring_submit_sqe *ctx) {
   struct event *e;
   struct io_uring_submit_sqe *extra;
+  struct io_kiocb *io_kiocb;
   unsigned op_str_off;
 
   e = __init_event(IO_URING_SUBMIT_SQE);
   if (e == NULL) return 1;
 
   extra = &(e->extra.io_uring_submit_sqe);
+  extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->opcode = ctx->opcode;
   extra->flags = ctx->flags;
@@ -106,8 +108,8 @@ int handle_queue_async_work(struct trace_event_raw_io_uring_queue_async_work *ct
   e = __init_event(IO_URING_QUEUE_ASYNC_WORK);
   if (e == NULL) return 1;
 
-
   extra = &(e->extra.io_uring_queue_async_work);
+  extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->opcode = ctx->opcode;
   extra->flags = ctx->flags;
@@ -129,6 +131,7 @@ int handle_complete(struct trace_event_raw_io_uring_complete *ctx) {
   if (e == NULL) return 1;
 
   extra = &(e->extra.io_uring_complete);
+  extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->res = ctx->res;
   extra->cflags = ctx->cflags;

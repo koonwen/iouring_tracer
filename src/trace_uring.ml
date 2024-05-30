@@ -17,22 +17,28 @@ let handle_event (rw : Ring_writer.t) _ctx data _size =
   let u = getf event D.ufield in
   (match getf event D.t with
   | D.SYS_ENTER_IO_URING_ENTER ->
-      Ring_writer.sys_enter_start_event rw ~pid ~tid ~name:"IO_URING_ENTER"
-        ~comm ~ts
+      W.duration_begin rw.fxt ~name:"IO_URING_ENTER"
+        ~thread:W.{ pid; tid }
+        ~category:"syscalls" ~ts
   | D.SYS_EXIT_IO_URING_ENTER ->
-      Ring_writer.sys_enter_end_event rw ~pid ~tid ~name:"IO_URING_EXIT" ~comm
-        ~ts
+      W.duration_end rw.fxt ~name:"IO_URING_ENTER"
+        ~thread:W.{ pid; tid }
+        ~category:"syscalls" ~ts
   (* Tracepoints *)
-  | D.IO_URING_CREATE -> ()
+  | D.IO_URING_CREATE ->
+      let t = getf u D.io_uring_create |> D.Struct_io_uring_create.unload in
+      Ring_writer.create_event rw ~pid ~ring_fd:t.fd ~ring_ctx:t.ctx_ptr ~tid
+        ~name:"io_uring_create" ~comm ~ts
   | D.IO_URING_SUBMIT_SQE ->
       let t =
         getf u D.io_uring_submit_sqe |> D.Struct_io_uring_submit_sqe.unload
       in
-      Ring_writer.submission_event rw ~pid ~tid ~name:"io_uring_submit" ~comm ~ts
-        ~correlation_id:t.req_ptr
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      Ring_writer.submission_event rw ~pid ~ring_ctx:t.ctx_ptr ~tid
+        ~name:"io_uring_submit" ~comm ~ts ~correlation_id:req_ptr
         ~args:
           [
-            ("req", `Pointer t.req_ptr);
+            ("req", `Pointer req_ptr);
             ("op_str", `String t.op_str);
             ("opcode", `Int64 (Int64.of_int t.opcode));
             ("flags", `Int64 (Int64.of_int t.flags));
@@ -44,8 +50,9 @@ let handle_event (rw : Ring_writer.t) _ctx data _size =
         getf u D.io_uring_queue_async_work
         |> D.Struct_io_uring_queue_async_work.unload
       in
-      Ring_writer.async_work_event rw ~pid ~tid ~name:"io_uring_queue_async_work" ~comm
-        ~ts ~correlation_id:t.req_ptr
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      Ring_writer.async_work_event rw ~pid ~ring_ctx:t.ctx_ptr ~tid
+        ~name:"io_uring_queue_async_work" ~comm ~ts ~correlation_id:req_ptr
         ~args:
           [
             ("opcode", `Int64 (Int64.of_int t.opcode));
@@ -55,11 +62,12 @@ let handle_event (rw : Ring_writer.t) _ctx data _size =
           ]
   | D.IO_URING_COMPLETE ->
       let t = getf u D.io_uring_complete |> D.Struct_io_uring_complete.unload in
-      Ring_writer.completion_event rw ~pid ~tid ~name:"io_uring_complete" ~comm ~ts
-        ~correlation_id:t.req_ptr
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      Ring_writer.completion_event rw ~pid ~ring_ctx:t.ctx_ptr ~tid
+        ~name:"io_uring_complete" ~comm ~ts ~correlation_id:req_ptr
         ~args:
           [
-            ("req", `Pointer t.req_ptr);
+            ("req", `Pointer req_ptr);
             ("res", `Int64 (Int64.of_int t.res));
             ("cflags", `Int64 (Int64.of_int32 t.cflags));
           ]);

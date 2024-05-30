@@ -16,7 +16,7 @@ include Defs.Uring.Bindings (Uring_generated)
 module Struct_io_uring_create = struct
   type t = {
     fd : int;
-    ctx_ptr : int64;
+    ctx_ptr : nativeint;
     sq_entries : int32;
     cq_entries : int32;
     flags : int32;
@@ -33,7 +33,7 @@ module Struct_io_uring_create = struct
 
   let unload (t : t structure) =
     let fd = getf t fd in
-    let ctx_ptr = getf t ctx |> raw_address_of_ptr |> Int64.of_nativeint in
+    let ctx_ptr = getf t ctx |> raw_address_of_ptr in
     let cq_entries = getf t cq_entries |> Unsigned.UInt32.to_int32 in
     let sq_entries = getf t sq_entries |> Unsigned.UInt32.to_int32 in
     let flags = getf t flags |> Unsigned.UInt32.to_int32 in
@@ -42,7 +42,8 @@ end
 
 module Struct_io_uring_submit_sqe = struct
   type t = {
-    req_ptr : int64;
+    ctx_ptr : nativeint;
+    req_ptr : nativeint;
     opcode : int;
     flags : int;
     force_nonblock : bool;
@@ -52,6 +53,7 @@ module Struct_io_uring_submit_sqe = struct
 
   let t : t structure typ = structure "io_uring_submit_sqe"
   let ( -: ) ty label = field t label ty
+  let ctx = ptr void -: "ctx"
   let req = ptr void -: "req"
   let opcode = uint8_t -: "opcode"
   let flags = ulong -: "flags"
@@ -61,18 +63,20 @@ module Struct_io_uring_submit_sqe = struct
   let _ = seal t
 
   let unload (t : t structure) =
-    let req_ptr = getf t req |> raw_address_of_ptr |> Int64.of_nativeint in
+    let ctx_ptr = getf t ctx |> raw_address_of_ptr in
+    let req_ptr = getf t req |> raw_address_of_ptr in
     let opcode = getf t opcode |> Unsigned.UInt8.to_int in
     let flags = getf t flags |> Unsigned.ULong.to_int in
     let force_nonblock = getf t force_nonblock in
     let sq_thread = getf t sq_thread in
     let op_str = getf t op_str |> char_array_as_string in
-    { req_ptr; opcode; flags; force_nonblock; sq_thread; op_str }
+    { req_ptr; ctx_ptr; opcode; flags; force_nonblock; sq_thread; op_str }
 end
 
 module Struct_io_uring_queue_async_work = struct
   type t = {
-    req_ptr : int64;
+    ctx_ptr : nativeint;
+    req_ptr : nativeint;
     opcode : int;
     flags : int32;
     work_ptr : int64;
@@ -81,6 +85,7 @@ module Struct_io_uring_queue_async_work = struct
 
   let t : t structure typ = structure "io_uring_queue_async_work"
   let ( -: ) ty label = field t label ty
+  let ctx = ptr void -: "ctx"
   let req = ptr void -: "req"
   let opcode = uint8_t -: "opcode"
   let flags = uint32_t -: "flags"
@@ -89,29 +94,37 @@ module Struct_io_uring_queue_async_work = struct
   let _ = seal t
 
   let unload (t : t structure) =
-    let req = getf t req |> raw_address_of_ptr |> Int64.of_nativeint in
+    let ctx_ptr = getf t ctx |> raw_address_of_ptr in
+    let req_ptr = getf t req |> raw_address_of_ptr in
     let opcode = getf t opcode |> Unsigned.UInt8.to_int in
     let flags = getf t flags |> Unsigned.UInt32.to_int32 in
     let work_ptr = getf t work |> raw_address_of_ptr |> Int64.of_nativeint in
     let op_str = getf t op_str |> char_array_as_string in
-    { req_ptr = req; opcode; flags; work_ptr; op_str }
+    { ctx_ptr; req_ptr; opcode; flags; work_ptr; op_str }
 end
 
 module Struct_io_uring_complete = struct
-  type t = { req_ptr : int64; res : int; cflags : int32 }
+  type t = {
+    req_ptr : nativeint;
+    ctx_ptr : nativeint;
+    res : int;
+    cflags : int32;
+  }
 
   let t : t structure typ = structure "io_uring_complete"
   let ( -: ) ty label = field t label ty
+  let ctx = ptr void -: "ctx"
   let req = ptr void -: "req"
   let res = int -: "res"
   let cflags = uint32_t -: "cflags"
   let _ = seal t
 
   let unload (t : t structure) =
-    let req_ptr = getf t req |> raw_address_of_ptr |> Int64.of_nativeint in
+    let ctx_ptr = getf t ctx |> raw_address_of_ptr in
+    let req_ptr = getf t req |> raw_address_of_ptr in
     let res = getf t res in
     let cflags = getf t cflags |> Unsigned.UInt32.to_int32 in
-    { req_ptr; res; cflags }
+    { ctx_ptr; req_ptr; res; cflags }
 end
 
 type event
