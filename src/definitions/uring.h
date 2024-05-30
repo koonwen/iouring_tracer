@@ -8,10 +8,22 @@
 
 enum tracepoint_t {
   IO_URING_CREATE,
+  IO_URING_REGISTER,
+  IO_URING_FILE_GET,
   IO_URING_SUBMIT_SQE,
   IO_URING_QUEUE_ASYNC_WORK,
-  IO_URING_COMPLETE,
+  IO_URING_POLL_ARM,
+  IO_URING_TASK_ADD,
+  IO_URING_TASK_WORK_RUN,
+  IO_URING_SHORT_WRITE,
+  IO_URING_LOCAL_WORK_RUN,
+  IO_URING_DEFER,
+  IO_URING_LINK,
+  IO_URING_FAIL_LINK,
   IO_URING_CQRING_WAIT,
+  IO_URING_REQ_FAILED,
+  IO_URING_CQE_OVERFLOW,
+  IO_URING_COMPLETE,
   SYS_ENTER_IO_URING_ENTER,
   SYS_EXIT_IO_URING_ENTER
 };
@@ -22,6 +34,21 @@ struct io_uring_create {
   unsigned long sq_entries;
   unsigned long cq_entries;
   unsigned long flags;
+};
+
+struct io_uring_register {
+  void *ctx;
+  unsigned opcode;
+  unsigned nr_files;
+  unsigned nr_bufs;
+  long ret;
+};
+
+struct io_uring_file_get {
+  void *ctx;
+  void *req;
+  /* unsigned long long user_data; */
+  int fd;
 };
 
 struct io_uring_submit_sqe {
@@ -45,7 +72,102 @@ struct io_uring_queue_async_work {
   void *work;
   /* int rw; */
   /* unsigned long __data_loc_op_str; */
-  char op_str [MAX_OP_STR_LEN];
+  char op_str[MAX_OP_STR_LEN];
+};
+
+struct io_uring_poll_arm {
+  void *ctx;
+  void *req;
+  /* unsigned long long user_data; */
+  unsigned char opcode;
+  int mask;
+  int events;
+  char op_str[MAX_OP_STR_LEN];
+};
+
+struct io_uring_task_add {
+  void *ctx;
+  void *req;
+  /* unsigned long long user_data; */
+  unsigned char opcode;
+  int mask;
+  char op_str[MAX_OP_STR_LEN];
+};
+
+struct io_uring_task_work_run {
+  void *tctx;
+  unsigned int count;
+  unsigned int loops;
+};
+
+struct io_uring_short_write {
+  void *ctx;
+  unsigned long long fpos;
+  unsigned long long wanted;
+  unsigned long long got;
+};
+
+struct io_uring_local_work_run {
+  void *ctx;
+  int count;
+  unsigned int loops;
+};
+
+struct io_uring_defer {
+  void *ctx;
+  void *req;
+  /* unsigned long long data; */
+  unsigned char opcode;
+  char op_str[MAX_OP_STR_LEN];
+};
+
+struct io_uring_link {
+
+  void *ctx;
+  void *req;
+  void *target_req;
+};
+
+struct io_uring_fail_link {
+  void *ctx;
+  void *req;
+  /* unsigned long long user_data; */
+  unsigned char opcode;
+  void *link;
+  char op_str[MAX_OP_STR_LEN];
+};
+
+struct io_uring_cqring_wait {
+  void *ctx;
+  int min_events;
+};
+
+struct io_uring_req_failed {
+  void *ctx;
+  void *req;
+  /* unsigned long long user_data; */
+  unsigned char opcode;
+  unsigned char flags;
+  unsigned char ioprio;
+  unsigned long long off;
+  unsigned long long addr;
+  unsigned long len;
+  unsigned long op_flags;
+  unsigned int buf_index;
+  unsigned int personality;
+  unsigned long file_index;
+  unsigned long long pad1;
+  unsigned long long addr3;
+  int error;
+  char op_str[MAX_OP_STR_LEN];
+};
+
+struct io_uring_cqe_overflow {
+  void *ctx;
+  unsigned long long user_data;
+  long res;
+  unsigned long cflags;
+  void *ocqe;
 };
 
 struct io_uring_complete {
@@ -56,11 +178,6 @@ struct io_uring_complete {
   unsigned int cflags;
   /* unsigned long long extra1; */
   /* unsigned long long extra2; */
-};
-
-struct io_uring_cqring_wait {
-  void *ctx;
-  int min_events;
 };
 
 /* struct sys_enter_io_uring_enter { */
@@ -79,9 +196,21 @@ struct event {
   char comm[TASK_COMM_LEN];
   union extra {
     struct io_uring_create io_uring_create;
+    struct io_uring_register io_uring_register;
+    struct io_uring_file_get io_uring_file_get;
     struct io_uring_submit_sqe io_uring_submit_sqe;
     struct io_uring_queue_async_work io_uring_queue_async_work;
+    struct io_uring_poll_arm io_uring_poll_arm;
+    struct io_uring_task_add io_uring_task_add;
+    struct io_uring_task_work_run io_uring_task_work_run;
+    struct io_uring_short_write io_uring_short_write;
+    struct io_uring_local_work_run io_uring_local_work_run;
+    struct io_uring_defer io_uring_defer;
+    struct io_uring_link io_uring_link;
+    struct io_uring_fail_link io_uring_fail_link;
     struct io_uring_cqring_wait io_uring_cqring_wait;
+    struct io_uring_req_failed io_uring_req_failed;
+    struct io_uring_cqe_overflow io_uring_cqe_overflow;
     struct io_uring_complete io_uring_complete;
   } extra;
 };
