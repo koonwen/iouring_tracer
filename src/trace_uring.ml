@@ -4,6 +4,8 @@ module T = Libbpf.Types
 module W = Fxt.Write
 module D = Definitions
 
+type poll_behaviour = Poll of int | Busywait [@@warning "-37"]
+
 exception Exit of int
 
 (* Describe event handler *)
@@ -90,7 +92,7 @@ let handle_event (rw : Ring_writer.t) _ctx data _size =
   | _ -> ());
   0
 
-let run handle_event =
+let run ?(poll_behaviour = Poll 100) handle_event =
   (* Implicitly bump RLIMIT_MEMLOCK to create BPF maps *)
   F.libbpf_set_strict_mode T.LIBBPF_STRICT_AUTO_RLIMIT_MEMLOCK;
 
@@ -215,21 +217,24 @@ let run handle_event =
 
   at_exit (fun () -> Printf.printf "Consumed %d events\n" !cb);
 
-  while !exitting do
-    let err = F.ring_buffer__poll rb 100 in
-    match err with
-    | e when e = Sys.sighup -> raise (Exit 0)
-    | e when e < 0 ->
-        Printf.eprintf "Error polling ring buffer, %d\n" e;
-        raise (Exit 1)
-    | i -> cb := !cb + i
-    (* match F.ring_buffer__consume rb with *)
-    (* | i when i >= 0 -> cb := !cb + i *)
-    (* | e when e = Sys.sighup -> raise (Exit 0) *)
-    (* | e -> *)
-    (*     Printf.eprintf "Error polling ring buffer, %d\n" e; *)
-    (*     raise (Exit 1) *)
-  done;
+  (match poll_behaviour with
+  | Poll timeout ->
+      while !exitting do
+        let err = F.ring_buffer__poll rb timeout in
+        match err with
+        | e when e = Sys.sighup -> raise (Exit 0)
+        | e when e < 0 ->
+            Printf.eprintf "Error polling ring buffer, %d\n" e;
+            raise (Exit 1)
+        | i -> cb := !cb + i
+      done
+  | Busywait -> (
+      match F.ring_buffer__consume rb with
+      | i when i >= 0 -> cb := !cb + i
+      | e when e = Sys.sighup -> raise (Exit 0)
+      | e ->
+          Printf.eprintf "Error polling ring buffer, %d\n" e;
+          raise (Exit 1)));
 
   raise (Exit 0)
 

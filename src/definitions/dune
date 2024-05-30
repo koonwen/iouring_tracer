@@ -1,59 +1,54 @@
-; Step 1: Compile OCaml generator that takes in definitions in defs.h
+(library
+ (name const)
+ (modules const)
+ (libraries ctypes))
+
+; Step 1: Compile OCaml generator that has "include" directives for
+; the uring.h & uring.skel.h headers
 
 (executable
  (name def_generator)
  (modules def_generator)
- (libraries ctypes.stubs ctypes defs))
+ (libraries ctypes.stubs ctypes const))
 
 ; Step 2: Execute OCaml generator in step 1, producing C generator
 
 (rule
- (targets uring_stubs_gen.c)
+ (targets stubs_gen.c)
  (deps def_generator.exe)
  (action
   (run %{deps})))
 
-; Step 3: Compile C generator produced in step 2
+; Step 3: Compile C generator produced in step 2, this step requires
+; the headers to be locatable by the compiler
 
 (rule
- (targets uring_stubs_gen.out)
- (deps uring_stubs_gen.c uring.h)
+ (targets uring.h uring.skel.h)
+ (action
+  (progn
+   (copy# ../uring.skel.h uring.skel.h)
+   (copy# %{project_root}/bpf/uring.h uring.h))))
+
+(rule
+ (targets stubs_gen.out)
+ (deps stubs_gen.c uring.h uring.skel.h)
  (action
   (bash
    "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -o %{targets}")))
 
 ; Step 4: Execute C generator from Step 3 to produce OCaml type definitions
 
-; Generate vmlinux.h using system bpftool
-
-; (rule
-;  (mode
-;   (promote (until-clean)))
-;  (targets vmlinux.h)
-;  (action
-;   (with-stdout-to
-;    %{targets}
-;    (run /usr/sbin/bpftool btf dump file /sys/kernel/btf/vmlinux format c))))
-
-(rule
- (mode
-  (promote (until-clean)))
- (targets uring.h)
- (action
-  (progn
-   (copy ../uring.h uring.h))))
-
 (rule
  (targets uring_generated.ml)
- (deps uring_stubs_gen.out uring.h)
+ (deps stubs_gen.out)
  (action
   (with-stdout-to
    %{targets}
    (run %{deps} -ml))))
 
-; Step 5: Add in types dependent on definitions discovered in defs.h
+; Step 5: Add in types dependent on definitions discovered in uring.h & uring.skel.h
 
 (library
  (name definitions)
  (modules uring_generated definitions)
- (libraries ctypes defs))
+ (libraries ctypes const))

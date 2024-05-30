@@ -11,7 +11,7 @@ let char_array_as_string a =
     Buffer.contents b
   with Exit -> Buffer.contents b
 
-include Defs.Uring.Bindings (Uring_generated)
+include Const.Bindings (Uring_generated)
 
 module Struct_io_uring_create = struct
   type t = {

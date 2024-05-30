@@ -14,18 +14,17 @@
   (promote (until-clean)))
  (deps
   (source_tree %{project_root}/bpf))
- (targets
-  uring.bpf.o
-  uring.h)
+ (targets uring.bpf.o uring.skel.h)
  (action
   (no-infer
    (progn
     (chdir
-      %{project_root}/bpf
+     %{project_root}/bpf
      (run make))
     (copy %{project_root}/bpf/output/uring.bpf.o uring.bpf.o)
-    (copy# %{project_root}/bpf/uring.h uring.h)))))
+    (copy %{project_root}/bpf/output/uring.skel.h uring.skel.h)))))
 
+; Try building bpf code with dune?
 ; (rule
 ;  (alias bpf)
 ;  (target trace_uring.bpf.o)
