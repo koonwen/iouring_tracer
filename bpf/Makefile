@@ -9,6 +9,7 @@ VMLINUX := vmlinux/$(ARCH)/vmlinux.h
 INCLUDES := -I$(OUTPUT) -I/usr/include/x86_64-linux-gnu/ -I$(dir $(VMLINUX))
 
 PROBES = uring
+BINS = size
 
 ifeq ($(V),1)
 	Q =
@@ -23,12 +24,13 @@ else
 endif
 
 .PHONY: all
-all: $(addprefix $(OUTPUT)/,$(addsuffix .skel.h,$(PROBES))) $(addprefix $(OUTPUT)/,$(addsuffix .bpf.o,$(PROBES)))
+
+all: $(addprefix $(OUTPUT)/,$(addsuffix .skel.h,$(PROBES))) $(addprefix $(OUTPUT)/,$(addsuffix .bpf.o,$(PROBES))) $(addprefix $(OUTPUT)/,$(BINS))
 
 .PHONY: clean
 clean:
 	$(call msg,CLEAN)
-	$(Q)rm -rf $(OUTPUT) $(PROBES)
+	$(Q)rm -rf $(OUTPUT)
 
 $(OUTPUT):
 	$(call msg,MKDIR,$@)
@@ -54,3 +56,7 @@ $(VMLINUX):
 
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
+
+$(OUTPUT)/% : $(BINS).c
+	$(call msg,SIZE,$@)
+	$(Q)$(CLANG) -g -O2 -o $@ $^
