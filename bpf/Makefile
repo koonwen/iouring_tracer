@@ -8,7 +8,7 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/')
 VMLINUX := vmlinux/$(ARCH)/vmlinux.h
 INCLUDES := -I$(OUTPUT) -I/usr/include/x86_64-linux-gnu/ -I$(dir $(VMLINUX))
 
-APPS = uring
+PROBES = uring
 
 ifeq ($(V),1)
 	Q =
@@ -23,12 +23,12 @@ else
 endif
 
 .PHONY: all
-all: $(addprefix $(OUTPUT)/,$(addsuffix .skel.h,$(APPS))) $(addprefix $(OUTPUT)/,$(addsuffix .bpf.o,$(APPS)))
+all: $(addprefix $(OUTPUT)/,$(addsuffix .skel.h,$(PROBES))) $(addprefix $(OUTPUT)/,$(addsuffix .bpf.o,$(PROBES)))
 
 .PHONY: clean
 clean:
 	$(call msg,CLEAN)
-	$(Q)rm -rf $(OUTPUT) $(APPS)
+	$(Q)rm -rf $(OUTPUT) $(PROBES)
 
 $(OUTPUT):
 	$(call msg,MKDIR,$@)

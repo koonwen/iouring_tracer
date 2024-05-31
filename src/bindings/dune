@@ -1,21 +1,21 @@
 (library
- (name const)
- (modules const)
- (libraries ctypes))
+ (name compile_time)
+ (modules compile_time)
+ (libraries ctypes.stubs))
 
 ; Step 1: Compile OCaml generator that has "include" directives for
 ; the uring.h & uring.skel.h headers
 
 (executable
- (name def_generator)
- (modules def_generator)
- (libraries ctypes.stubs ctypes const))
+ (name stub_gen)
+ (modules stub_gen)
+ (libraries ctypes.stubs compile_time))
 
 ; Step 2: Execute OCaml generator in step 1, producing C generator
 
 (rule
- (targets stubs_gen.c)
- (deps def_generator.exe)
+ (targets stub_gen.c)
+ (deps stub_gen.exe)
  (action
   (run %{deps})))
 
@@ -30,8 +30,9 @@
    (copy# %{project_root}/bpf/uring.h uring.h))))
 
 (rule
- (targets stubs_gen.out)
- (deps stubs_gen.c uring.h uring.skel.h)
+ (targets stub_gen.out)
+ (deps stub_gen.c uring.h ; uring.skel.h
+ )
  (action
   (bash
    "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -o %{targets}")))
@@ -40,7 +41,7 @@
 
 (rule
  (targets uring_generated.ml)
- (deps stubs_gen.out)
+ (deps stub_gen.out)
  (action
   (with-stdout-to
    %{targets}
@@ -49,6 +50,6 @@
 ; Step 5: Add in types dependent on definitions discovered in uring.h & uring.skel.h
 
 (library
- (name definitions)
- (modules uring_generated definitions)
- (libraries ctypes const))
+ (name bindings)
+ (modules uring_generated bindings)
+ (libraries ctypes.foreign compile_time ocaml_libbpf))

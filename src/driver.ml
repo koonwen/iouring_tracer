@@ -2,7 +2,13 @@ open Ocaml_libbpf
 module F = Libbpf.Functions
 module T = Libbpf.Types
 module W = Fxt.Write
-module D = Definitions
+module B = Bindings
+
+type uring_bpf
+external uring_bpf__open_and_load: unit -> uring_bpf = "caml_uring_bpf__open_and_load"
+external uring_bpf__destroy: uring_bpf -> unit = "caml_uring_bpf__destroy"
+external uring_bpf__attach: uring_bpf -> int = "caml_uring_bpf__attach"
+external uring_bpf__get_rb: uring_bpf -> T.bpf_map Ctypes.structure Ctypes.ptr = "caml_uring_bpf__get_rb"
 
 type poll_behaviour = Poll of int | Busywait [@@warning "-37"]
 
@@ -20,7 +26,7 @@ let pipeline (handlers : handler list) ctx data size_t =
   (* Return 0 *)
   0
 
-let load_run ~poll_behaviour ~bpf_object_path ~program_names handlers =
+let load_run ~poll_behaviour handlers =
   (* Implicitly bump RLIMIT_MEMLOCK to create BPF maps *)
   F.libbpf_set_strict_mode T.LIBBPF_STRICT_AUTO_RLIMIT_MEMLOCK;
 
@@ -30,58 +36,16 @@ let load_run ~poll_behaviour ~bpf_object_path ~program_names handlers =
   Sys.(set_signal sigint sig_handler);
   Sys.(set_signal sigterm sig_handler);
 
-  (* Read BPF object *)
-  let obj =
-    match F.bpf_object__open bpf_object_path with
-    | None ->
-        Printf.eprintf "Failed to open BPF object\n";
-        raise (Exit 1)
-    | Some obj -> obj
-  in
+  (* Create and Load skeleton *)
+  let skel = uring_bpf__open_and_load () in
 
-  at_exit (fun () -> F.bpf_object__close obj);
-
-  (* Load BPF object *)
-  if F.bpf_object__load obj = 1 then (
-    Printf.eprintf "Failed to load BPF object\n";
-    raise (Exit 1));
-
-  (* Find program by name *)
-  let progs =
-    let find_exn name =
-      match F.bpf_object__find_program_by_name obj name with
-      | None ->
-          Printf.eprintf "Failed to find bpf program: %s\n" name;
-          raise (Exit 1)
-      | Some p -> p
-    in
-    List.map find_exn program_names
-  in
+  at_exit (fun () -> uring_bpf__destroy skel);
 
   (* Attach tracepoint *)
-  let links =
-    let attach_exn prog =
-      let link = F.bpf_program__attach prog in
-      if F.libbpf_get_error (Ctypes.to_voidp link) <> Signed.Long.zero then (
-        Printf.eprintf "Failed to attach BPF program\n";
-        raise (Exit 1));
-      link
-    in
-    List.map attach_exn progs
-  in
-
-  at_exit (fun () ->
-      List.iter (fun link -> F.bpf_link__destroy link |> ignore) links);
-
-  (* Load maps *)
-  let map =
-    match F.bpf_object__find_map_by_name obj "rb" with
-    | None ->
-        Printf.eprintf "Failed to find map";
-        raise (Exit 1)
-    | Some m -> m
-  in
-  let rb_fd = F.bpf_map__fd map in
+  if uring_bpf__attach skel <> 0 then (
+    Printf.eprintf "Failed to attach BPF skeleton\n";
+    raise (Exit 1))
+  else Printf.printf "Successfully started!\n%!";
 
   let handle_event_coerce =
     let open Ctypes in
@@ -92,7 +56,10 @@ let load_run ~poll_behaviour ~bpf_object_path ~program_names handlers =
       T.ring_buffer_sample_fn handler
   in
 
+  let rb = uring_bpf__get_rb skel in
+  let rb_fd = F.bpf_map__fd rb in
   (* Set up ring buffer polling *)
+
   let rb =
     match
       F.ring_buffer__new rb_fd handle_event_coerce Ctypes.null
@@ -130,8 +97,7 @@ let load_run ~poll_behaviour ~bpf_object_path ~program_names handlers =
           raise (Exit 1)));
   raise (Exit 0)
 
-let run ?(tracefile = "trace.fxt") ?(poll_behaviour = Poll 100) ~bpf_object_path
-    ~program_names handlers =
+let run ?(tracefile = "trace.fxt") ?(poll_behaviour = Poll 100) handlers =
   Eio_linux.run @@ fun env ->
   Eio.Switch.run (fun sw ->
       let output_file = Eio.Path.( / ) (Eio.Stdenv.cwd env) tracefile in
@@ -140,5 +106,5 @@ let run ?(tracefile = "trace.fxt") ?(poll_behaviour = Poll 100) ~bpf_object_path
       in
       Eio.Buf_write.with_flow out (fun w ->
           let _fxt = W.of_writer w in
-          try load_run ~poll_behaviour ~bpf_object_path ~program_names handlers
+          try load_run ~poll_behaviour handlers
           with Exit i -> Printf.eprintf "exit %d%!" i))

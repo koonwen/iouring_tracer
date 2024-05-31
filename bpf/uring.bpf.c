@@ -33,7 +33,7 @@ static void __incr_counter(void) {
   bpf_map_update_elem(&globals, &counter_index, value, 0);
 }
 
-static struct event *__init_event(enum tracepoint_t t) {
+static struct event *__init_event(enum tracepoint_t ty) {
   struct event *e;
   u64 id;
 
@@ -44,7 +44,7 @@ static struct event *__init_event(enum tracepoint_t t) {
     return NULL;
   }
   id = bpf_get_current_pid_tgid();
-  e->t = t;
+  e->ty = ty;
   e->pid = id >> 32;
   e->tid = id;
   e->ts = bpf_ktime_get_ns();
@@ -64,7 +64,7 @@ int handle_create(struct trace_event_raw_io_uring_create *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_create);
+  extra = &(e->io_uring_create);
   extra->fd = ctx->fd;
   extra->ctx = ctx->ctx;
   extra->sq_entries = ctx->sq_entries;
@@ -84,7 +84,7 @@ int handle_register(struct trace_event_raw_io_uring_register *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_register);
+  extra = &(e->io_uring_register);
   extra->ctx = ctx->ctx;
   extra->opcode = ctx->opcode;
   extra->nr_files = ctx->nr_files;
@@ -103,7 +103,7 @@ int handle_file_get(struct trace_event_raw_io_uring_file_get *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_file_get);
+  extra = &(e->io_uring_file_get);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->fd = ctx->fd;
@@ -123,7 +123,7 @@ int handle_submit(struct trace_event_raw_io_uring_submit_sqe *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_submit_sqe);
+  extra = &(e->io_uring_submit_sqe);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->opcode = ctx->opcode;
@@ -149,7 +149,7 @@ int handle_queue_async_work(
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_queue_async_work);
+  extra = &(e->io_uring_queue_async_work);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->opcode = ctx->opcode;
@@ -173,7 +173,7 @@ int handle_poll_arm(struct trace_event_raw_io_uring_poll_arm *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_poll_arm);
+  extra = &(e->io_uring_poll_arm);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->opcode = ctx->opcode;
@@ -197,7 +197,7 @@ int handle_task_add(struct trace_event_raw_io_uring_task_add *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_task_add);
+  extra = &(e->io_uring_task_add);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->mask = ctx->mask;
@@ -219,7 +219,7 @@ int handle_task_work_run(struct trace_event_raw_io_uring_task_work_run *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_task_work_run);
+  extra = &(e->io_uring_task_work_run);
   extra->tctx = ctx->tctx;
   extra->count = ctx->count;
   extra->loops = ctx->loops;
@@ -237,7 +237,7 @@ int handle_short_write(struct trace_event_raw_io_uring_short_write *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_short_write);
+  extra = &(e->io_uring_short_write);
   extra->ctx = ctx->ctx;
   extra->fpos = ctx->fpos;
   extra->wanted = ctx->wanted;
@@ -256,7 +256,7 @@ int handle_local_work_run(struct trace_event_raw_io_uring_local_work_run *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_local_work_run);
+  extra = &(e->io_uring_local_work_run);
   extra->ctx = ctx->ctx;
   extra->count = ctx->count;
   extra->loops = ctx->loops;
@@ -275,7 +275,7 @@ int handle_defer(struct trace_event_raw_io_uring_defer *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_defer);
+  extra = &(e->io_uring_defer);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->opcode = ctx->opcode;
@@ -296,7 +296,7 @@ int handle_link(struct trace_event_raw_io_uring_link *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_link);
+  extra = &(e->io_uring_link);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->target_req = ctx->target_req;
@@ -315,7 +315,7 @@ int handle_fail_link(struct trace_event_raw_io_uring_fail_link *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_fail_link);
+  extra = &(e->io_uring_fail_link);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->opcode = ctx->opcode;
@@ -337,7 +337,7 @@ int handle_cqring_wait(struct trace_event_raw_io_uring_cqring_wait *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_cqring_wait);
+  extra = &(e->io_uring_cqring_wait);
   extra->ctx = ctx->ctx;
   extra->min_events = ctx->min_events;
 
@@ -355,7 +355,7 @@ int handle_req_failed(struct trace_event_raw_io_uring_req_failed *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_req_failed);
+  extra = &(e->io_uring_req_failed);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->opcode = ctx->opcode;
@@ -389,7 +389,7 @@ int handle_cqe_overflow(struct trace_event_raw_io_uring_cqe_overflow *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_cqe_overflow);
+  extra = &(e->io_uring_cqe_overflow);
   extra->ctx = ctx->ctx;
   extra->user_data = ctx->user_data;
   extra->res = ctx->res;
@@ -409,7 +409,7 @@ int handle_complete(struct trace_event_raw_io_uring_complete *ctx) {
   if (e == NULL)
     return 1;
 
-  extra = &(e->extra.io_uring_complete);
+  extra = &(e->io_uring_complete);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->res = ctx->res;

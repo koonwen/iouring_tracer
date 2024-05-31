@@ -188,12 +188,12 @@ struct io_uring_complete {
 /* } */
 
 struct event {
-  enum tracepoint_t t;
+  enum tracepoint_t ty;
   int pid;
   int tid;
   unsigned long long ts;
   char comm[TASK_COMM_LEN];
-  union extra {
+  union {
     struct io_uring_create io_uring_create;
     struct io_uring_register io_uring_register;
     struct io_uring_file_get io_uring_file_get;
@@ -211,7 +211,7 @@ struct event {
     struct io_uring_req_failed io_uring_req_failed;
     struct io_uring_cqe_overflow io_uring_cqe_overflow;
     struct io_uring_complete io_uring_complete;
-  } extra;
+  };
 };
 
 /* enum io_uring_op { */
