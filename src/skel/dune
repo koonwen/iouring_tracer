@@ -1,0 +1,18 @@
+; To be deleted
+(executable
+ (name test_skel)
+ (libraries skel_driver bindings fxt)
+ (modules test_skel))
+
+(library
+ (name skel_driver)
+ (libraries ocaml_libbpf bindings fxt eio_linux)
+ (foreign_stubs
+  (language c)
+  (names skel_stubs))
+ (modules skel_driver))
+
+(rule
+ (targets uring.skel.h)
+ (action
+  (copy ../uring.skel.h uring.skel.h)))

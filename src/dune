@@ -4,21 +4,9 @@
  (libraries driver bindings fxt)
  (modules trace_uring ring_writer))
 
-; To be deleted
-(executable
- (name test_skel)
- (libraries driver bindings fxt)
- ; (foreign_stubs
- ;  (language c)
- ;  (names skel_stubs))
- (modules test_skel))
-
 (library
  (name driver)
  (libraries ocaml_libbpf bindings fxt eio_linux)
- (foreign_stubs
-  (language c)
-  (names skel_stubs))
  (modules driver))
 
 (rule
