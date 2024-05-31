@@ -4,68 +4,23 @@ module T = Libbpf.Types
 module W = Fxt.Write
 module D = Definitions
 
+type poll_behaviour = Poll of int | Busywait [@@warning "-37"]
+
 exception Exit of int
 
-module Write = struct
-  type t = {
-    sqring : Fxt.Write.thread;
-    cqring : W.thread;
-    syscalls : Fxt.Write.thread;
-    fxt : Fxt.Write.t;
-  }
+type handler = unit Ctypes.ptr -> unit Ctypes.ptr -> Unsigned.size_t -> int
 
-  let submission_event ?args t ~name ~ts ~correlation_id =
-    W.duration_begin t.fxt ?args ~name ~thread:t.sqring ~category:"uring" ~ts;
-    W.flow_begin t.fxt ~correlation_id ?args ~name ~thread:t.sqring
-      ~category:"uring" ~ts;
-    W.duration_end t.fxt ?args ~name ~thread:t.sqring ~category:"uring" ~ts
-
-  let completion_event ~correlation_id ?args t ~name ~ts =
-    W.duration_begin t.fxt ?args ~name ~thread:t.cqring ~category:"uring" ~ts;
-    W.flow_end t.fxt ~correlation_id ?args ~name ~thread:t.cqring
-      ~category:"uring" ~ts;
-    W.duration_end t.fxt ?args ~name ~thread:t.cqring ~category:"uring" ~ts
-
-  let make fxt =
-    let pid = Int64.of_int (Unix.getpid ()) in
-    let t =
-      {
-        sqring = W.{ pid; tid = 0L };
-        cqring = W.{ pid; tid = 1L };
-        syscalls = W.{ pid; tid = 2L };
-        fxt;
-      }
-    in
-    W.kernel_object fxt
-      ~args:[ ("process", `Koid pid) ]
-      ~name:"SQRING" `Thread t.sqring.tid;
-    W.kernel_object fxt
-      ~args:[ ("process", `Koid pid) ]
-      ~name:"CQRING" `Thread t.cqring.tid;
-    W.kernel_object fxt
-      ~args:[ ("process", `Koid pid) ]
-      ~name:"SYSCALLS" `Thread t.syscalls.tid;
-    t
-end
-
-type handler =
-  unit Ctypes_static.ptr ->
-  unit Ctypes_static.ptr ->
-  Unsigned.size_t ->
-  W.t ->
-  int
-
-let pipeline fxt (handlers : handler list) ctx data size_t =
+let pipeline (handlers : handler list) ctx data size_t =
   List.iter
     (fun handler ->
-      match handler ctx data size_t fxt with
+      match handler ctx data size_t with
       | 0 -> () (* result ok *)
       | e -> raise (Exit e))
     handlers;
   (* Return 0 *)
   0
 
-let event_loop ~bpf_object_path ~program_names handlers fxt =
+let load_run ~poll_behaviour ~bpf_object_path ~program_names handlers =
   (* Implicitly bump RLIMIT_MEMLOCK to create BPF maps *)
   F.libbpf_set_strict_mode T.LIBBPF_STRICT_AUTO_RLIMIT_MEMLOCK;
 
@@ -130,7 +85,7 @@ let event_loop ~bpf_object_path ~program_names handlers fxt =
 
   let handle_event_coerce =
     let open Ctypes in
-    let handler = pipeline fxt handlers in
+    let handler = pipeline handlers in
     coerce
       (Foreign.funptr ~runtime_lock:true ~check_errno:true
          (ptr void @-> ptr void @-> size_t @-> returning int))
@@ -149,20 +104,34 @@ let event_loop ~bpf_object_path ~program_names handlers fxt =
     | Some rb -> rb
   in
 
-  at_exit (fun () -> F.ring_buffer__free rb);
+  let cb = ref 0 in
 
-  while !exitting do
-    let err = F.ring_buffer__poll rb 100 in
-    match err with
-    | e when e = Sys.sighup -> raise (Exit 0)
-    | e when e < 0 ->
-        Printf.eprintf "Error polling ring buffer, %d\n" e;
-        raise (Exit 1)
-    | _ -> ()
-  done
+  at_exit (fun () ->
+      F.ring_buffer__free rb;
+      Printf.printf "Consumed %d events\n" !cb);
 
-let event_loop_run ?(tracefile = "trace.fxt") ~bpf_object_path ~program_names
-    handlers =
+  (match poll_behaviour with
+  | Poll timeout ->
+      while !exitting do
+        let err = F.ring_buffer__poll rb timeout in
+        match err with
+        | e when e = Sys.sighup -> raise (Exit 0)
+        | e when e < 0 ->
+            Printf.eprintf "Error polling ring buffer, %d\n" e;
+            raise (Exit 1)
+        | i -> cb := !cb + i
+      done
+  | Busywait -> (
+      match F.ring_buffer__consume rb with
+      | i when i >= 0 -> cb := !cb + i
+      | e when e = Sys.sighup -> raise (Exit 0)
+      | e ->
+          Printf.eprintf "Error polling ring buffer, %d\n" e;
+          raise (Exit 1)));
+  raise (Exit 0)
+
+let run ?(tracefile = "trace.fxt") ?(poll_behaviour = Poll 100) ~bpf_object_path
+    ~program_names handlers =
   Eio_linux.run @@ fun env ->
   Eio.Switch.run (fun sw ->
       let output_file = Eio.Path.( / ) (Eio.Stdenv.cwd env) tracefile in
@@ -170,6 +139,6 @@ let event_loop_run ?(tracefile = "trace.fxt") ~bpf_object_path ~program_names
         Eio.Path.open_out ~sw ~create:(`Or_truncate 0o644) output_file
       in
       Eio.Buf_write.with_flow out (fun w ->
-          let fxt = W.of_writer w in
-          try event_loop ~bpf_object_path ~program_names handlers fxt
+          let _fxt = W.of_writer w in
+          try load_run ~poll_behaviour ~bpf_object_path ~program_names handlers
           with Exit i -> Printf.eprintf "exit %d%!" i))

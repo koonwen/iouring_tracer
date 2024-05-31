@@ -1,13 +1,13 @@
 (executable
  (public_name trace_uring)
  (name trace_uring)
- (libraries util definitions fxt)
+ (libraries driver definitions fxt)
  (modules trace_uring ring_writer))
 
 (library
- (name util)
+ (name driver)
  (libraries ocaml_libbpf definitions fxt eio_linux)
- (modules util))
+ (modules driver))
 
 (rule
  (mode
