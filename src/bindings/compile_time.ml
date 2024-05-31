@@ -381,6 +381,7 @@ module Bindings (T : Cstubs_structs.TYPE) = struct
     let res = int -: "res"
     let cflags = uint -: "cflags"
     let _ = seal (t : t Ctypes.structure typ)
+
   end
 
   module Struct_event = struct

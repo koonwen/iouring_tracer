@@ -3,24 +3,27 @@ module F = Libbpf.Functions
 module T = Libbpf.Types
 module W = Fxt.Write
 module B = Bindings
+module RW = Ring_writer
 
 type poll_behaviour = Poll of int | Busywait
 
 exception Exit of int
 
-type handler = unit Ctypes.ptr -> unit Ctypes.ptr -> Unsigned.size_t -> int
+type handler =
+  Ring_writer.t -> unit Ctypes.ptr -> unit Ctypes.ptr -> Unsigned.size_t -> int
 
-let pipeline (handlers : handler list) ctx data size_t =
+let pipeline (handlers : handler list) writer ctx data size_t =
   List.iter
     (fun handler ->
-      match handler ctx data size_t with
+      match handler writer ctx data size_t with
       | 0 -> () (* result ok *)
       | e -> raise (Exit e))
     handlers;
   (* Return 0 *)
   0
 
-let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names handlers =
+let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
+    ~(writer : Ring_writer.t) handlers =
   (* Implicitly bump RLIMIT_MEMLOCK to create BPF maps *)
   F.libbpf_set_strict_mode T.LIBBPF_STRICT_AUTO_RLIMIT_MEMLOCK;
 
@@ -113,7 +116,7 @@ let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names handlers =
     coerce
       (Foreign.funptr ~runtime_lock:true ~check_errno:true
          (ptr void @-> ptr void @-> size_t @-> returning int))
-      T.ring_buffer_sample_fn handler
+      T.ring_buffer_sample_fn (handler writer)
   in
 
   (* Set up ring buffer polling *)
@@ -132,7 +135,7 @@ let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names handlers =
 
   at_exit (fun () ->
       F.ring_buffer__free rb;
-      Printf.printf "Consumed %d events\n" !cb);
+      Printf.printf "Consumed %d events\n%!" !cb);
 
   (match poll_behaviour with
   | Poll timeout ->
@@ -163,8 +166,8 @@ let run ?(tracefile = "trace.fxt") ?(poll_behaviour = Poll 100) ~bpf_object_path
         Eio.Path.open_out ~sw ~create:(`Or_truncate 0o644) output_file
       in
       Eio.Buf_write.with_flow out (fun w ->
-          let _fxt = W.of_writer w in
+          let writer = Ring_writer.make (W.of_writer w) in
           try
-            load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
+            load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names ~writer
               handlers
-          with Exit i -> Printf.eprintf "exit %d%!" i))
+          with Exit i -> Printf.eprintf "exit %d\n" i))

@@ -2,12 +2,13 @@
  (public_name trace_uring)
  (name trace_uring)
  (libraries driver bindings fxt)
- (modules trace_uring ring_writer))
+ (modules trace_uring ; ring_writer
+))
 
 (library
  (name driver)
  (libraries ocaml_libbpf bindings fxt eio_linux)
- (modules driver))
+ (modules driver ring_writer))
 
 (rule
  (mode

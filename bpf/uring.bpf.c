@@ -113,7 +113,7 @@ int handle_file_get(struct trace_event_raw_io_uring_file_get *ctx) {
 }
 
 SEC("tp/io_uring/io_uring_submit_sqe")
-int handle_submit(struct trace_event_raw_io_uring_submit_sqe *ctx) {
+int handle_submit_sqe(struct trace_event_raw_io_uring_submit_sqe *ctx) {
   struct event *e;
   struct io_uring_submit_sqe *extra;
   struct io_kiocb *io_kiocb;
