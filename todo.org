@@ -967,66 +967,226 @@ I've put that aside
     - [X] Use SQE polling
 
 ** <2024-05-23 Thu>
-  - [ ] Improving tracing
-    - [ ] Fix nested calls (Needs separate tracks)
+  - [X] Improving tracing
+    - [X] Fix nested calls (Needs separate tracks)
+
+** <2024-05-24 Fri>
+- [X] Improving trace visualization
+  - [X] Implement flows
+  - [X] Implement separate tracks for uring submission and completion queue
+  - [X] Add flows to fxt writer library
+  - [X] Understand and write about how uring works (detailing what happens exactly in the kernel)
+
+** <2024-05-25 Sat>
+- [X] Clean io-uring tracer repo
+- [X] Cleaner separation of ocaml-libbpf and iouring_tracer.
+
+  ANS: libbpf are concerned with pure bindings, iouring_tracer has the
+  bpf kernel program and can also bind arbritrary skel code or user
+  custom structs
+
+- [X] Work on bpf side to count events dropped.
+- [X] Count number of events dropped and work on seeing how to overcome this
+
+  ANS: Implemented counter to see how many events are dropped, by
+  right, polling should be able to keep up until 1Mil ops/s. We don't
+  hit that stat but somehow we are dropping events.
+
+
+** <2024-05-28 Tue>
+- [X] Write last weeks work
+
+- [X] Continue building understanding how uring makes things
+  asynchronous and think of better ways to visualize this
+- [X] Debug dropped events or at least find a temporary solution
+
+  ANS: Consumer seems to go 300,000 ops/sec (Could be because of
+  caml_runtime_lock_acquire everytime during polling)
+
+** <2024-05-29 Wed>
+- [X] Set up automated way of having new tracks depending on the
+  number of rings the user spawns (Wrapper of fxt)
+** <2024-05-30 Thu>
+  - [X] Write out todos and discussion for today
+  - [X] Fix visualization
+
+*** TODO <2024-05-23 Thu>
+- [ ]  Benchmarks
+  - [ ] Optimizing uring performance
+    - [ ] Use fixed buffers
+    - [ ] set IO_SQE_ASYNC flag on requests
+  - [ ] Accessing files by path vs FD
+  - [ ] Use linking vs non linking
+  - [ ] Bench hybrid strategy, Using all cores versus some kind of split (in sqpoll mode)
+  - [ ] eio benchmark http with sqpoll, can check that out.
+  - [ ] Figure out why sqring_wait fails
+
+- [-] Improving trace visualization
+  - [X] Research io-uring execution model to plan out visualization
+    (Check README.md in iouring_tracer_clean branch for notes)
+  - [X] Better visualization of submit/complete
+    - [X] Add support for FXT flow events and see how they display in perfetto
+    - [X] Use separate tracks
+  - [X] Investigate & fix dropped events
+    - [X] Implement counter in bpf kernel side to count number of
+      dropped events due to lack of space in ring buffer space.
+      ANS: True, dropping due to inability to reserve space.
+    - [X] Check producer & consumer rates
+      ANS: Our OCaml consumer picks up request at 300,000 ops/s, on fs
+      benchmarks, bpf can drive up to 800,000 ops/s (cold cache), even
+      higher when files are in cache.
+
+    - [X] Increase Ring buffer size
+      ANS: helps slightly but catches up quite fast
+    - [X] Theoretical benchmarks say that we should be able to
+      accomodate just about 1M ops/s, but this is with a C handler,
+      perhaps we are having overhead from runtime lock acquiring?
+      ANS: Not really possible in a clean way
+
+  - [X] Add dynamic track creation in FXT
+
+  - [X] Support other tracepoints
+    - [X] io_uring_queue_async_work
+    - [X] io_uring_create
+
+  - [X] Cleaning up bpf code
+    - [X] Abstract out reusable functions
+
+  - [-] Make ocaml_libbpf more ergonomic
+    - [X] Implement more core low-level bindings
+    - [ ] Write high-level easy to use wrappers
+
+**** Discussion
+- In OCaml, I get the same pid for multiple OCaml domains, is that expected?
+ANS: domains have different tids but same pids.
+
+- Portability, vmlinux.h are specific to kernel version, but we have
+  to rewrite them into userspace with arbritrary types?
+- C types are a range, long is at least 32 bit, etc. Then how do we
+  ensure the types are consistent?
+  ANS: Yes this will be a problem, use <stdint.h>
 
 
 
 * NEXT Meeting
-** TODO <2024-05-23 Thu>
-- [ ]  Benchmarks
-  - [ ] Optimizing uring performance
-    - [ ] Use fixed buffers
-  - [ ] Accessing files by path vs FD
-  - [ ] Use linking vs non linking
-  - [ ] Bench hybrid strategy, Using all cores versus some kind of split (in sqpoll mode)
+** TODO <2024-05-30 Thu>
+- [ ] iouring_tracer tool
+  - [ ] Implement ctypes skel code for easier handling of bpf code
+    Experimented but was hard to glue together, initial work in skel directory
+  - [ ] Add leftover tracepoint visualizations (fxt writing)
+  - [ ] Load pids to trace from OCaml program to bpf map.
+  - [ ] Implement sampling option, use some kind of a hash to mark if
+    a request should be kept or not (or modulus of request)
+  - [ ] Check how to publish a binary for iouring-tracer
+  - [ ] Fix to <stdint.h> types
 
-- [ ] Improving trace visualization
-  - [ ] Understand and write about how uring works (detailing what happens exactly in the kernel)
-  - [ ] Uring can have parallel syscalls in flight, figure out how to account for this
-  - [ ] Fix nested calls
-    - [ ] Add support for FXT async/flow events and see how they display in perfetto
-    - [ ] Use separate tracks
-  - [ ] Dropped events
-    - [ ] Sample syscalls instead of tracing everything
+- [ ] ocaml-libbpf library
+  - [ ] Write high-level easy to use interface
+  - [ ] Work on publishing ocaml-libbpf (check if libbpf needs to be built alongside the kernel)
 
-
-  - [ ] eio benchmark http with sqpoll, can check that out.
-  - [ ] Figure out why sqring_wait fails
 
 ** IO-uring under the hood
 IO-uring is a subsystem implemented in the Linux kernel that provides
-asynchronous API's to IO.
+"generic"and "true" asynchronous API's for IO. The late posix aio
+interface was criticised to be asynchronous only sometimes and useful
+only for storage IO.
 
+At the heart of it, io-uring is implemented with two ring buffers that
+are shared by the kernel and the user application. One ring is called
+the submission queue ring where the user application puts IO requests
+for the kernel to consume. The other is called the completion queue
+ring which is where the kernel puts the results of the requests and is
+consumed by the application.
 
-At the heart of it, there are two ring buffers which are shared by the
-kernel and the user application. One ring is called the submission
-queue ring where the user application puts IO requests for the kernel
-to consume. The other is called the completion queue ring which is
-where the kernel puts the results of the requests and is consumed by
-the application.
+Between the time the kernel consumes the requests and returns the
+results, io-uring makes various 'smart' decisions on how your IO
+should be handled asynchronously. There are notable 3 pathways a
+request can take when handled in the kernel.
 
-Between the time the kernel consumes the requests and
-returns the results, io-uring makes various 'smart' decisions on how
-your IO should be handled asynchronously. This is what I will focus on.
+User Space:                          Kernel Space:
+  ┌─────────────────────────────┐      ┌─────────────────────────────┐
+  │io_uring_enter()             │      │io_uring_enter()             │
+  └─────────────────────────────┘      └─────────────────────────────┘
+         │                                  │
+         │                                  │
+         ▼                                  │
+  ┌─────────────────────────────┐           │
+  │Submit SQEs to SQ ring       │           │
+  └─────────────────────────────┘           ▼
+         │                                  │
+         ▼                                  ▼
+  ┌─────────────────────────────┐    ┌─────────────────────────────┐
+  │Process SQEs                 │    │io_submit_sqes()              │
+  └─────────────────────────────┘    └─────────────────────────────┘
+         │                                  │
+         │                                  │
+         ▼                                  ▼
+  ┌─────────────────────────────┐    ┌─────────────────────────────┐
+  │Queue SQE for execution      │    │io_queue_sqe()                │
+  └─────────────────────────────┘    └─────────────────────────────┘
+         │                                  │
+         │                                  │
+         ▼                                  ▼
+  ┌─────────────────────────────┐    ┌─────────────────────────────┐
+  │Execute I/O Operation        │    │io_read(), io_write(), etc.   │
+  └─────────────────────────────┘    └─────────────────────────────┘
+         │                                  │
+         │                                  │
+         ▼                                  ▼
+  ┌─────────────────────────────┐    ┌─────────────────────────────┐
+  │Fill Completion Queue (CQ)   │    │io_cqring_fill_event()        │
+  └─────────────────────────────┘    └─────────────────────────────┘
+         │                                  │
+         │                                  │
+         ▼                                  ▼
+  ┌─────────────────────────────┐    ┌─────────────────────────────┐
+  │Check Completion Queue (CQ)  │    │io_get_cqe()                  │
+  └─────────────────────────────┘    └─────────────────────────────┘
 
+io_queue_sqe() is where the main decision making occurs. Here, it
+checks whether your IO request can be handled immediately (meaning
+that it is ready, think about data on a socket). In which case, it
+runs directly without blocking. This is the fast path.
 
-** Notes:
-The SQ limit is half of the max CQ entries, presumably to prevent
-blocking when the kernel is processing a submission request and the
-user application wants to submit another request.
+If data is not ready to be consumed, then uring either arms a poll on
+the file descriptor to wait to be notified, or passes this off to a
+worker pool of threads that pick up the request and get blocked (this
+changed recently to support internally performing a poll).
 
-** Ideas for visualization
-Define separate tracks as Submission ring track and Completion ring
-track? Which means you need to define two kernel objects and link requests appropriately
+Questions:
+- Find out where io_op_def->issue is defined and what it contains.
+- What is task work?
+
+*** Notes:
+- The SQ limit is half of the max CQ entries, presumably to prevent
+  blocking when the kernel is processing a submission request and the
+  user application wants to submit another request.
+
+- Potential optimization:
+  - If we know that operations are going to punt off to asynchronous
+    calls, you can set IO_ASYNC_SQE flag on the request to remove
+    checks that data is ready.
+
+  - Use provided buffers to let the kernel allocate when data is ready
+    instead of providing them during submission
+
+  - Register fixed files to reduce fget, fput to kernel struct
+    managing fds
 
 ** BPF ring buffer
-- We could be dropping events not because of there is no space but
-  because of high contention. Ringbuf should be able to support 1Mil ops/s
-- ADd a counter to see exactly how many events we are dropping.
+- Ocaml consumer can't keep up, it has some overhead from acquiring
+  the runtime lock, processes 300_000 ops/s
+- bpf events are produced at spike to 800_000ops/s (on cold cache)
+- 1.3Mops/s (when files are in cache)
 
-bpf-helpers.h are for kernel programming
-bpf/libbpf.h and those annotated with LIBBPF are exposed to userspace for use
+bpf/
+bpf-helpers.h
+bpf-tracing.h
+bpf-core.h
+- are for bpf kernel code
+
+libbpf.h
+are exposed to userspace for use
 
 * Backlog:
 ** Tracing analysis
