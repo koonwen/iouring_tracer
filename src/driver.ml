@@ -1,9 +1,25 @@
 open Ocaml_libbpf
-module F = Libbpf.Functions
-module T = Libbpf.Types
+module F = Primative.Functions
+module T = Primative.Types
 module W = Fxt.Write
 module B = Bindings
 module RW = Ring_writer
+
+module CInt : Conv with type t = int = struct
+  type t = int
+
+  let c_type = Ctypes.int
+  let empty = 0
+end
+
+module CLong : Conv with type t = Signed.Long.t = struct
+  type t = Signed.Long.t
+
+  let c_type = Ctypes.long
+  let empty = Signed.Long.zero
+end
+
+module M = Bpf_maps.Make (CInt) (CLong)
 
 type poll_behaviour = Poll of int | Busywait
 
@@ -87,28 +103,15 @@ let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
   let rb_fd = F.bpf_map__fd map in
 
   at_exit (fun () ->
-      match F.bpf_object__find_map_by_name obj "globals" with
+      match bpf_object_find_map_by_name obj "globals" with
       | None -> Printf.eprintf "Failed to find globals map"
-      | Some counter -> (
-          let open Ctypes in
-          let sz_key = Ctypes.(sizeof int |> Unsigned.Size_t.of_int) in
-          let sz_value = Ctypes.(sizeof long |> Unsigned.Size_t.of_int) in
-          let key = Ctypes.(allocate int 0) in
-          let value_cnt = Ctypes.(allocate long Signed.Long.zero) in
-          let flags = Unsigned.UInt64.zero in
-          let counter =
-            F.bpf_map__lookup_elem counter (to_voidp key) sz_key
-              (to_voidp value_cnt) sz_value flags
-          in
-          if counter <> 0 then
-            Printf.eprintf "Failed to lookup element got %d\n" counter
-          else
-            match !@value_cnt with
-            | i when i = Signed.Long.zero -> ()
-            | i ->
-                Printf.eprintf
-                  "Failed to reserve space in Ringbuf, Dropped events %s\n"
-                  (Ctypes_value_printing.string_of long i)));
+      | Some map -> (
+          match M.bpf_map_lookup_value_op map 2 with
+          | Error _e -> Printf.eprintf "Failed to lookup element at index 0\n"
+          | Ok v ->
+              Printf.eprintf
+                "Failed to reserve space in Ringbuf, Dropped events %s\n"
+                (Ctypes_value_printing.string_of Ctypes.long v)));
 
   let handle_event_coerce =
     let open Ctypes in

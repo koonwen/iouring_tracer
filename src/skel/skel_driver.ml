@@ -1,6 +1,6 @@
 open Ocaml_libbpf
-module F = Libbpf.Functions
-module T = Libbpf.Types
+module F = Primative.Functions
+module T = Primative.Types
 module W = Fxt.Write
 module B = Bindings
 

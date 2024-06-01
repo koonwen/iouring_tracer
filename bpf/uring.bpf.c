@@ -10,37 +10,41 @@ struct {
   __uint(max_entries, 256 * 4096 /* 256 KB */);
 } rb SEC(".maps");
 
-/* Create an array with 1 entry instead of a global variable
- * which does not work with older kernels */
+/* Globals implemented as an array */
+/* pid | total | dropped | skipped | sampling_idx */
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
-  __uint(max_entries, 1);
+  __uint(max_entries, 5);
   __type(key, int);
   __type(value, long);
 } globals SEC(".maps");
 
-int counter_index = 0;
-long counter = 0;
+int pid_idx = 0;
+int total_idx = 1;
+int dropped_idx = 2;
+int skipped_idx = 3;
+int sampling_idx = 4;
 
-static void __incr_counter(void) {
+static void __incr_count(int *idx) {
   long *value;
-  value = bpf_map_lookup_elem(&globals, &counter_index);
+  value = bpf_map_lookup_elem(&globals, idx);
   if (value == NULL) {
     bpf_printk("Error got NULL");
     return;
   };
   (*value)++;
-  bpf_map_update_elem(&globals, &counter_index, value, 0);
+  bpf_map_update_elem(&globals, idx, value, 0);
 }
 
 static struct event *__init_event(enum tracepoint_t ty) {
   struct event *e;
   u64 id;
+  __incr_count(&total_idx);
 
   /* Try to reserve space from BPF ringbuf */
   e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
   if (!e) {
-    __incr_counter();
+    __incr_count(&dropped_idx);
     return NULL;
   }
   id = bpf_get_current_pid_tgid();
@@ -54,6 +58,34 @@ static struct event *__init_event(enum tracepoint_t ty) {
 
   return e;
 }
+
+static void filter(int ev_pid, void *req) {
+  long *pid, *sampling;
+  pid = bpf_map_lookup_elem(&globals, &pid_idx);
+  if (pid == NULL) {
+    bpf_printk("Error: Lookup pid got NULL");
+    return;
+  };
+  /* Drop if pid not matching */
+  if (ev_pid != *pid) {
+    return;
+  };
+
+  sampling = bpf_map_lookup_elem(&globals, &sampling_idx);
+  if (pid == NULL) {
+    bpf_printk("Error: Lookup sampling got NULL");
+    return;
+  };
+
+  /* Drop if not perfect modulus of sampling_value */
+  if (((long) req % (long) sampling) != 0) {
+    return;
+  };
+
+  /* Otherwise tailcall to process rest of the event */
+  /* TODO */
+}
+
 
 SEC("tp/io_uring/io_uring_create")
 int handle_create(struct trace_event_raw_io_uring_create *ctx) {
