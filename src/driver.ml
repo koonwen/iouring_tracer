@@ -65,6 +65,15 @@ let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
     Printf.eprintf "Failed to load BPF object\n";
     raise (Exit 1));
 
+  (* Init global maps *)
+  let globals =
+    match bpf_object_find_map_by_name obj "globals" with
+    | None ->
+        Printf.eprintf "Failed to find globals map";
+        raise (Exit 1)
+    | Some map -> map
+  in
+
   (* Find program by name *)
   let progs =
     let find_exn name =
@@ -103,15 +112,18 @@ let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
   let rb_fd = F.bpf_map__fd map in
 
   at_exit (fun () ->
-      match bpf_object_find_map_by_name obj "globals" with
-      | None -> Printf.eprintf "Failed to find globals map"
-      | Some map -> (
-          match M.bpf_map_lookup_value_op map 2 with
-          | Error _e -> Printf.eprintf "Failed to lookup element at index 0\n"
-          | Ok v ->
-              Printf.eprintf
-                "Failed to reserve space in Ringbuf, Dropped events %s\n"
-                (Ctypes_value_printing.string_of Ctypes.long v)));
+      let total = M.bpf_map_lookup_value_op globals 1 |> Result.get_ok in
+      let dropped = M.bpf_map_lookup_value_op globals 2 |> Result.get_ok in
+      let unrelated = M.bpf_map_lookup_value_op globals 3 |> Result.get_ok in
+      let skipped = M.bpf_map_lookup_value_op globals 4 |> Result.get_ok in
+      let str_of_long clong =
+        Ctypes_value_printing.string_of Ctypes.long clong
+      in
+      Printf.printf
+        "Total events %s, Dropped events %s, Unrelated events %s, Skipped \
+         events %s\n"
+        (str_of_long total) (str_of_long dropped) (str_of_long skipped)
+        (str_of_long unrelated));
 
   let handle_event_coerce =
     let open Ctypes in
@@ -139,6 +151,20 @@ let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
   at_exit (fun () ->
       F.ring_buffer__free rb;
       Printf.printf "Consumed %d events\n%!" !cb);
+
+  (* Something weird is happening, not sure why the events don't tally
+     up *)
+  let index i = Ctypes.allocate Ctypes.int i in
+  let zero = Ctypes.allocate Ctypes.long Signed.Long.zero in
+  let initialize_idx i =
+    assert(F.Bpf.bpf_map_update_elem globals.fd
+      (index i |> Ctypes.to_voidp)
+      (Ctypes.to_voidp zero) Unsigned.UInt64.zero = 0)
+  in
+  (* Set all globals to zero, need to do this because we might
+     encounter events before the ring buffer can be submitted to *)
+  List.iter initialize_idx [0;1;2;3;4];
+
 
   (match poll_behaviour with
   | Poll timeout ->

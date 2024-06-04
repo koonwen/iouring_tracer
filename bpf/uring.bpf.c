@@ -11,10 +11,10 @@ struct {
 } rb SEC(".maps");
 
 /* Globals implemented as an array */
-/* pid | total | dropped | skipped | sampling_idx */
+/* pid | total | dropped | skipped | unrelated | sampling_idx */
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
-  __uint(max_entries, 5);
+  __uint(max_entries, 6);
   __type(key, int);
   __type(value, long);
 } globals SEC(".maps");
@@ -23,7 +23,8 @@ int pid_idx = 0;
 int total_idx = 1;
 int dropped_idx = 2;
 int skipped_idx = 3;
-int sampling_idx = 4;
+int unrelated_idx = 4;
+int sampling_idx = 5;
 
 static void __incr_count(int *idx) {
   long *value;
@@ -54,36 +55,36 @@ static struct event *__init_event(enum tracepoint_t ty) {
   e->ts = bpf_ktime_get_ns();
   bpf_get_current_comm(&e->comm, sizeof(e->comm));
 
-  /* bpf_printk("(%d) %d:%d", t, e->pid, e->tid); */
-
   return e;
 }
 
-static void filter(int ev_pid, void *req) {
+static int __filter_event(int ev_pid, void *req) {
   long *pid, *sampling;
   pid = bpf_map_lookup_elem(&globals, &pid_idx);
   if (pid == NULL) {
     bpf_printk("Error: Lookup pid got NULL");
-    return;
+    return 1;
   };
-  /* Drop if pid not matching */
-  if (ev_pid != *pid) {
-    return;
-  };
+  /* bpf_printk("ev_pid %d, pid %ld", ev_pid, pid); */
+  /* Drop if pid not matching, unrelated event */
+  /* if (ev_pid != *pid) { */
+  /*   __incr_count(&unrelated_idx); */
+  /*   return 1; */
+  /* }; */
 
   sampling = bpf_map_lookup_elem(&globals, &sampling_idx);
-  if (pid == NULL) {
+  if (sampling == NULL) {
     bpf_printk("Error: Lookup sampling got NULL");
-    return;
+    return 1;
   };
 
-  /* Drop if not perfect modulus of sampling_value */
-  if (((long) req % (long) sampling) != 0) {
-    return;
+  /* Skip if perfect modulups of sampling_value */
+  if (((uintptr_t) req % 10) != 0) {
+    __incr_count(&skipped_idx);
+    return 1;
   };
 
-  /* Otherwise tailcall to process rest of the event */
-  /* TODO */
+  return 0;
 }
 
 
@@ -91,6 +92,7 @@ SEC("tp/io_uring/io_uring_create")
 int handle_create(struct trace_event_raw_io_uring_create *ctx) {
   struct event *e;
   struct io_uring_create *extra;
+  long pid;
 
   e = __init_event(IO_URING_CREATE);
   if (e == NULL)
@@ -102,6 +104,11 @@ int handle_create(struct trace_event_raw_io_uring_create *ctx) {
   extra->sq_entries = ctx->sq_entries;
   extra->cq_entries = ctx->cq_entries;
   extra->flags = ctx->flags;
+
+
+  /* This will overwrite if another create is encountered!! TODO */
+  /* pid = e->pid; */
+  /* bpf_map_update_elem(&globals, &pid_idx, &pid, 0); */
 
   bpf_ringbuf_submit(e, 0);
   return 0;
@@ -155,6 +162,11 @@ int handle_submit_sqe(struct trace_event_raw_io_uring_submit_sqe *ctx) {
   if (e == NULL)
     return 1;
 
+  if (__filter_event(e->pid, ctx->req) == 1) {
+    bpf_ringbuf_discard(e, 0);
+    return 0;
+  }
+
   extra = &(e->io_uring_submit_sqe);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
@@ -180,6 +192,11 @@ int handle_queue_async_work(
   e = __init_event(IO_URING_QUEUE_ASYNC_WORK);
   if (e == NULL)
     return 1;
+
+  if (__filter_event(e->pid, ctx->req) == 1) {
+    bpf_ringbuf_discard(e, 0);
+    return 0;
+  }
 
   extra = &(e->io_uring_queue_async_work);
   extra->ctx = ctx->ctx;
@@ -441,11 +458,64 @@ int handle_complete(struct trace_event_raw_io_uring_complete *ctx) {
   if (e == NULL)
     return 1;
 
+  if (__filter_event(e->pid, ctx->req) == 1) {
+    bpf_ringbuf_discard(e, 0);
+    return 0;
+  }
+
   extra = &(e->io_uring_complete);
   extra->ctx = ctx->ctx;
   extra->req = ctx->req;
   extra->res = ctx->res;
   extra->cflags = ctx->cflags;
+
+  bpf_ringbuf_submit(e, 0);
+  return 0;
+}
+
+SEC("tp/syscalls/sys_enter_io_uring_setup")
+int handle_sys_enter_io_uring_setup(struct trace_event_raw_sys_enter *ctx) {
+  struct event *e;
+
+  e = __init_event(SYS_ENTER_IO_URING_SETUP);
+  if (e == NULL)
+    return 1;
+
+  bpf_ringbuf_submit(e, 0);
+  return 0;
+}
+
+SEC("tp/syscalls/sys_exit_io_uring_setup")
+int handle_sys_exit_io_uring_setup(struct trace_event_raw_sys_enter *ctx) {
+  struct event *e;
+
+  e = __init_event(SYS_EXIT_IO_URING_SETUP);
+  if (e == NULL)
+    return 1;
+
+  bpf_ringbuf_submit(e, 0);
+  return 0;
+}
+
+SEC("tp/syscalls/sys_enter_io_uring_register")
+int handle_sys_enter_io_uring_register(struct trace_event_raw_sys_enter *ctx) {
+  struct event *e;
+
+  e = __init_event(SYS_ENTER_IO_URING_REGISTER);
+  if (e == NULL)
+    return 1;
+
+  bpf_ringbuf_submit(e, 0);
+  return 0;
+}
+
+SEC("tp/syscalls/sys_exit_io_uring_register")
+int handle_sys_exit_io_uring_register(struct trace_event_raw_sys_enter *ctx) {
+  struct event *e;
+
+  e = __init_event(SYS_EXIT_IO_URING_REGISTER);
+  if (e == NULL)
+    return 1;
 
   bpf_ringbuf_submit(e, 0);
   return 0;

@@ -10,12 +10,14 @@ let handle_event (writer : RW.t) _ctx data _size =
   let comm = getf event Event.comm |> B.char_array_as_string in
   let ts = getf event Event.ts |> Unsigned.UInt64.to_int64 in
   (match getf event Event.ty with
-  | B.SYS_ENTER_IO_URING_ENTER ->
-      W.duration_begin writer.fxt ~name:"IO_URING_ENTER"
+  | ( B.SYS_ENTER_IO_URING_ENTER | B.SYS_ENTER_IO_URING_REGISTER
+    | B.SYS_ENTER_IO_URING_SETUP ) as ev ->
+      W.duration_begin writer.fxt ~name:(B.show_tracepoint_t ev)
         ~thread:W.{ pid; tid }
         ~category:"syscalls" ~ts
-  | B.SYS_EXIT_IO_URING_ENTER ->
-      W.duration_end writer.fxt ~name:"IO_URING_ENTER"
+  | ( B.SYS_EXIT_IO_URING_ENTER | B.SYS_EXIT_IO_URING_REGISTER
+    | B.SYS_EXIT_IO_URING_SETUP ) as ev ->
+      W.duration_end writer.fxt ~name:(B.show_tracepoint_t ev)
         ~thread:W.{ pid; tid }
         ~category:"syscalls" ~ts
   (* Tracepoints *)
@@ -100,11 +102,11 @@ let () =
         "handle_req_failed";
         "handle_cqe_overflow";
         "handle_complete";
-        (* "handle_sys_exit_io_uring_register"; *)
-        (* "handle_sys_enter_io_uring_register"; *)
-        (* "handle_sys_exit_io_uring_setup"; *)
-        (* "handle_sys_enter_io_uring_setup"; *)
-        "handle_sys_exit_io_uring_enter";
+        "handle_sys_enter_io_uring_setup";
+        "handle_sys_exit_io_uring_setup";
+        "handle_sys_enter_io_uring_register";
+        "handle_sys_exit_io_uring_register";
         "handle_sys_enter_io_uring_enter";
+        "handle_sys_exit_io_uring_enter";
       ]
     [ handle_event ]

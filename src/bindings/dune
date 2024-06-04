@@ -1,6 +1,8 @@
 (library
  (name compile_time)
  (modules compile_time)
+ (preprocess
+  (pps ppx_deriving.show))
  (libraries ctypes.stubs))
 
 ; Step 1: Compile OCaml generator that has "include" directives for
@@ -31,8 +33,10 @@
 
 (rule
  (targets stub_gen.out)
- (deps stub_gen.c uring.h ; uring.skel.h
- )
+ (deps
+  stub_gen.c
+  uring.h ; uring.skel.h
+  )
  (action
   (bash
    "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -o %{targets}")))

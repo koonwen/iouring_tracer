@@ -30,6 +30,13 @@ module Bindings (T : Cstubs_structs.TYPE) = struct
   and io_uring_req_failed = constant "IO_URING_REQ_FAILED" int64_t
   and io_uring_cqe_overflow = constant "IO_URING_CQE_OVERFLOW" int64_t
   and io_uring_complete = constant "IO_URING_COMPLETE" int64_t
+  and sys_enter_io_uring_setup = constant "SYS_ENTER_IO_URING_SETUP" int64_t
+  and sys_exit_io_uring_setup = constant "SYS_EXIT_IO_URING_SETUP" int64_t
+
+  and sys_enter_io_uring_register =
+    constant "SYS_ENTER_IO_URING_REGISTER" int64_t
+
+  and sys_exit_io_uring_register = constant "SYS_EXIT_IO_URING_REGISTER" int64_t
   and sys_enter_io_uring_enter = constant "SYS_ENTER_IO_URING_ENTER" int64_t
   and sys_exit_io_uring_enter = constant "SYS_EXIT_IO_URING_ENTER" int64_t
 
@@ -51,8 +58,12 @@ module Bindings (T : Cstubs_structs.TYPE) = struct
     | IO_URING_REQ_FAILED
     | IO_URING_CQE_OVERFLOW
     | IO_URING_COMPLETE
+    | SYS_ENTER_IO_URING_SETUP
+    | SYS_EXIT_IO_URING_SETUP
+    | SYS_ENTER_IO_URING_REGISTER
+    | SYS_EXIT_IO_URING_REGISTER
     | SYS_ENTER_IO_URING_ENTER
-    | SYS_EXIT_IO_URING_ENTER
+    | SYS_EXIT_IO_URING_ENTER [@@deriving  show {with_path = false }]
 
   let enum_tracepoint_t =
     enum "tracepoint_t"
@@ -74,6 +85,10 @@ module Bindings (T : Cstubs_structs.TYPE) = struct
         (IO_URING_REQ_FAILED, io_uring_req_failed);
         (IO_URING_CQE_OVERFLOW, io_uring_cqe_overflow);
         (IO_URING_COMPLETE, io_uring_complete);
+        (SYS_ENTER_IO_URING_SETUP, sys_enter_io_uring_setup);
+        (SYS_EXIT_IO_URING_SETUP, sys_exit_io_uring_setup);
+        (SYS_ENTER_IO_URING_REGISTER, sys_enter_io_uring_register);
+        (SYS_EXIT_IO_URING_REGISTER, sys_exit_io_uring_register);
         (SYS_ENTER_IO_URING_ENTER, sys_enter_io_uring_enter);
         (SYS_EXIT_IO_URING_ENTER, sys_exit_io_uring_enter);
       ]
@@ -381,7 +396,6 @@ module Bindings (T : Cstubs_structs.TYPE) = struct
     let res = int -: "res"
     let cflags = uint -: "cflags"
     let _ = seal (t : t Ctypes.structure typ)
-
   end
 
   module Struct_event = struct
@@ -439,5 +453,4 @@ module Bindings (T : Cstubs_structs.TYPE) = struct
   end
 
   (* ================================================================================ *)
-
 end

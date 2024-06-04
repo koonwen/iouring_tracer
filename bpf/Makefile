@@ -9,7 +9,7 @@ VMLINUX := vmlinux/$(ARCH)/vmlinux.h
 INCLUDES := -I$(OUTPUT) -I/usr/include/x86_64-linux-gnu/ -I$(dir $(VMLINUX))
 
 PROBES = uring
-BINS = size
+BINS = size sampling
 
 ifeq ($(V),1)
 	Q =
@@ -57,6 +57,6 @@ $(VMLINUX):
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
 
-$(OUTPUT)/% : $(BINS).c
-	$(call msg,SIZE,$@)
+$(OUTPUT)/% : %.c
+	$(call msg,BINS,$@)
 	$(Q)$(CLANG) -g -O2 -o $@ $^
