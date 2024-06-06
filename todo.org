@@ -1067,23 +1067,44 @@ ANS: domains have different tids but same pids.
   ANS: Yes this will be a problem, use <stdint.h>
 
 
+** <2024-05-31 Fri>
+- [ ] Add on rest of the missing tracepoints to load into the bpf program
+
+** <2024-06-04 Tue>
+- [ ] Work on some skel code bindings
+** <2024-06-05 Wed>
+- [ ] Fix build system for libbpf library, document and clean up
+** <2024-06-06 Thu>
+- [ ] Implement somemore high level APIs for libbpf
 
 * NEXT Meeting
 ** TODO <2024-05-30 Thu>
-- [ ] iouring_tracer tool
-  - [ ] Implement ctypes skel code for easier handling of bpf code
+- [-] iouring_tracer tool
+  - [X] Implement ctypes skel code for easier handling of bpf code
     Experimented but was hard to glue together, initial work in skel directory
-  - [ ] Add leftover tracepoint visualizations (fxt writing)
-  - [ ] Load pids to trace from OCaml program to bpf map.
-  - [ ] Implement sampling option, use some kind of a hash to mark if
+  - [X] Add leftover tracepoint visualizations (fxt writing)
+  - [X] Load pids to trace from OCaml program to bpf map.
+    ANS: We don't want this unless it's passed by the user to trace
+    that PID, in which case, it'll already be too late and events will
+    be missed
+  - [X] Implement sampling option, use some kind of a hash to mark if
     a request should be kept or not (or modulus of request)
+    ANS: Use modulus of 10, requests are always event parity
+    (presumably by alignment), we often get integers of 2, 4, 8, 10
   - [ ] Check how to publish a binary for iouring-tracer
   - [ ] Fix to <stdint.h> types
 
-- [ ] ocaml-libbpf library
-  - [ ] Write high-level easy to use interface
-  - [ ] Work on publishing ocaml-libbpf (check if libbpf needs to be built alongside the kernel)
+- [X] ocaml-libbpf library
+  - [X] Write high-level easy to use interface
+  - [X] Work on publishing ocaml-libbpf (check if libbpf needs to be built alongside the kernel)
 
+
+- Debug
+  - [ ] Missing events from OCaml and BPF
+
+
+Write up proposal for the diffing algorithm
+-
 
 ** IO-uring under the hood
 IO-uring is a subsystem implemented in the Linux kernel that provides
