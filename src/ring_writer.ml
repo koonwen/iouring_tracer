@@ -54,7 +54,9 @@ let create_event ?args t ~ring_fd ~ring_ctx ~pid ~tid ~name ~comm ~ts =
   (match Hashtbl.find_opt ring_tbl.tid_tbl ring_ctx with
   | Some _ -> failwith "Ring already registered"
   | None ->
-      Printf.printf "Registering %nd ring_ctx\n%!" ring_ctx;
+      let open Ctypes in
+      Printf.printf "Registering %s ring_ctx\n%!"
+        (string_of (ptr void) (ptr_of_raw_address ring_ctx));
       (* Register new ring ctx to track *)
       let tid_tbl' = { fd = ring_fd; tid_tbl = Hashtbl.create 10 } in
       Hashtbl.add ring_tbl.tid_tbl ring_ctx tid_tbl');

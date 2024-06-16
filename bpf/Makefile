@@ -9,7 +9,7 @@ VMLINUX := vmlinux/$(ARCH)/vmlinux.h
 INCLUDES := -I$(OUTPUT) -I/usr/include/x86_64-linux-gnu/ -I$(dir $(VMLINUX))
 
 PROBES = uring
-BINS = size sampling
+BINS = size
 
 ifeq ($(V),1)
 	Q =
