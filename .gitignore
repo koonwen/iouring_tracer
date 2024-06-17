@@ -85,4 +85,6 @@ _opam/
 modules.order
 Module.symvers
 Mkfile.old
+
 dkms.conf
+src/
