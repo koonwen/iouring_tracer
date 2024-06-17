@@ -5,6 +5,12 @@ probes ([`ocaml_libbpf`](https://github.com/koonwen/ocaml_libbpf)) to
 extract information from the kernel. Traces are generated in fuchsia
 format to be displayed on [Perfetto](https://ui.perfetto.dev/).
 
+### The Mental Model (taken from this [blog](https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool))
+![Flow of requests through uring](assets/uring-visual.png)
+
+### Example trace
+![gif of trace](assets/Recording.gif)
+
 ### Motivation
 The current best way to gain some observability into io-uring is to
 use `perf` to sample your program. Whilst this works, it can be hard
