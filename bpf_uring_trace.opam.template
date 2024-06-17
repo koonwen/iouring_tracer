@@ -1,2 +1,7 @@
 available: [ os = "linux" & os-version >= "5.8"]
 depexts: ["bpftool"]
+
+pin-depends: [ "ocaml_libbpf.dev" "git+https://github.com/koonwen/ocaml-libbpf.git" ]
+url {
+  src: "git+https://github.com/koonwen/ocaml-libbpf.git#main"
+}
