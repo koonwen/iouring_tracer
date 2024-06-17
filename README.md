@@ -83,32 +83,47 @@ multiple visualization of multiple rings and organizes them in a
 idiomatic way.
 
 # Current support
-  -  Path of IO request from submission to completion
-    - [X] Submission & Completion Ring Tracks
-    - [ ] Trace flow to completion
-	  - [X] io_uring_submit
-	  - [ ] io_uring_queue_async_work
-	  - [ ] io_uring_poll_arm
-	  - [X] io_uring_complete
+  - [-] Path of IO request from submission to completion
+    - [ ] Tracepoint visualisation support set
+      - [X] tracepoint:io_uring:io_uring_complete
+      - [ ] tracepoint:io_uring:io_uring_cqe_overflow
+      - [X] tracepoint:io_uring:io_uring_cqring_wait
+      - [X] tracepoint:io_uring:io_uring_create
+      - [ ] tracepoint:io_uring:io_uring_defer
+      - [ ] tracepoint:io_uring:io_uring_fail_link
+      - [ ] tracepoint:io_uring:io_uring_file_get
+      - [ ] tracepoint:io_uring:io_uring_link
+      - [ ] tracepoint:io_uring:io_uring_local_work_run
+      - [ ] tracepoint:io_uring:io_uring_poll_arm
+      - [X] tracepoint:io_uring:io_uring_queue_async_work
+      - [ ] tracepoint:io_uring:io_uring_register
+      - [ ] tracepoint:io_uring:io_uring_req_failed
+      - [ ] tracepoint:io_uring:io_uring_short_write
+      - [X] tracepoint:io_uring:io_uring_submit_sqe
+      - [ ] tracepoint:io_uring:io_uring_task_add
+      - [ ] tracepoint:io_uring:io_uring_task_work_run
+      - [X] tracepoint:syscalls:sys_enter_io_uring_enter
+      - [X] tracepoint:syscalls:sys_enter_io_uring_register
+      - [X] tracepoint:syscalls:sys_enter_io_uring_setup
+      - [X] tracepoint:syscalls:sys_exit_io_uring_enter
+      - [X] tracepoint:syscalls:sys_exit_io_uring_register
+      - [X] tracepoint:syscalls:sys_exit_io_uring_setup
+
     - [ ] Trace flow when event flags set IO-uring SQE link to see user enforced ordering of events.
     - [ ] We probably want to trace when the user picks up the completion so that we can see the ring filling/freeing up
 
-      io_uring_submit tracepoint is part of kernel io_uring:io_submit_sqe, this happens after io_uring_enter
-      io_uring_complete tracepoint happens in kernel io_uring:io_fill_cqe_aux
-
-  - [-] Syscall track
-    - [ ] io_uring_setup
-    - [ ] io_uring_register
+  - [X] Syscall track
+    - [X] io_uring_setup
+    - [X] io_uring_register
     - [X] io_uring_enter
-    - [ ] How to view context switches?
 
-  - [ ] IO-worker tracks
-    - [ ] Show number of workers and their work associated to rings
-    - [ ] Connect to flows
+  - [X] IO-worker tracks
+    - [X] Show number of workers and their work associated to rings
+    - [X] Connect to flows
 
-  - [ ] Multiple uring instance support
-	- [ ] Add each uring instance as a "process" track
-	- [ ] Add associated tracks under "threads" track
+  - [X] Multiple uring instance support
+    - [X] Add each uring instance as a "process" track
+    - [X] Add associated tracks under "threads" track
 
   - [ ] Suggestions
     - [ ] Track for Fixed buffer?
