@@ -63,7 +63,8 @@ module Bindings (T : Cstubs_structs.TYPE) = struct
     | SYS_ENTER_IO_URING_REGISTER
     | SYS_EXIT_IO_URING_REGISTER
     | SYS_ENTER_IO_URING_ENTER
-    | SYS_EXIT_IO_URING_ENTER [@@deriving  show {with_path = false }]
+    | SYS_EXIT_IO_URING_ENTER
+  [@@deriving show { with_path = false }]
 
   let enum_tracepoint_t =
     enum "tracepoint_t"
