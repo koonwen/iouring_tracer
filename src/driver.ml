@@ -4,7 +4,6 @@ module T = C.Types
 module W = Fxt.Write
 module B = Bindings
 module RW = Ring_writer
-module M = Bpf_maps.Make (Bpf_maps.IntConv) (Bpf_maps.LongConv)
 
 type poll_behaviour = Poll of int | Busywait
 
@@ -15,54 +14,49 @@ let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
   with_bpf_object_open_load_link ~obj_path:bpf_object_path
     ~program_names:bpf_program_names (fun obj _links ->
       (* Set signal handlers *)
-      let exitting = ref true in
-      let sig_handler = Sys.Signal_handle (fun _ -> exitting := false) in
+      let cont = ref true in
+      let sig_handler = Sys.Signal_handle (fun _ -> cont := false) in
       Sys.(set_signal sigint sig_handler);
       Sys.(set_signal sigterm sig_handler);
 
       let callback_w_ctx = callback writer in
       let map = bpf_object_find_map_by_name obj "rb" in
-      let rb = Bpf_maps.RingBuffer.init map ~callback:callback_w_ctx in
+      Ocaml_libbpf_maps.RingBuffer.init map ~callback:callback_w_ctx (fun rb ->
+          let cb = ref 0 in
 
-      let cb = ref 0 in
+          (match poll_behaviour with
+          | Poll timeout ->
+              while !cont do
+                match Ocaml_libbpf_maps.RingBuffer.poll rb ~timeout with
+                (* Ctrl-C will cause -EINTR exception *)
+                | e when e = Sys.sigint -> cont := false
+                | i -> cb := !cb + i
+              done
+          | Busywait -> (
+              match Ocaml_libbpf_maps.RingBuffer.consume rb with
+              | e when e = Sys.sigint -> cont := false
+              | i -> cb := !cb + i));
 
-      (match poll_behaviour with
-      | Poll timeout ->
-          while !exitting do
-            match Bpf_maps.RingBuffer.poll rb ~timeout with
-            | Ok i -> cb := !cb + i
-            (* Ctrl-C will cause Error EINTR *)
-            | Error e when e = Sys.sighup -> exitting := false
-            | Error e ->
-                Printf.eprintf "Error polling ring buffer, %d\n%!" e;
-                raise (Exit 1)
-          done
-      | Busywait -> (
-          match Bpf_maps.RingBuffer.consume rb with
-          | Ok i -> cb := !cb + i
-          | Error e when e = Sys.sighup -> raise (Exit 0)
-          | Error e ->
-              Printf.eprintf "Error polling ring buffer, %d\n%!" e;
-              raise (Exit 1)));
-
-      (* Print globals at the end *)
-      let globals = bpf_object_find_map_by_name obj "globals" in
-      let total = M.bpf_map_lookup_value globals 1 |> Result.get_ok in
-      let dropped = M.bpf_map_lookup_value globals 2 |> Result.get_ok in
-      let unrelated = M.bpf_map_lookup_value globals 3 |> Result.get_ok in
-      let skipped = M.bpf_map_lookup_value globals 4 |> Result.get_ok in
-      let str_of_long clong =
-        Ctypes_value_printing.string_of Ctypes.long clong
-      in
-      Printf.printf
-        "\n\
-         User-space consumed %d events\n\
-         Kernel-space recorded %s total events, %s dropped events, %s \
-         unrelated events, %s skipped events\n"
-        !cb (str_of_long total) (str_of_long dropped) (str_of_long skipped)
-        (str_of_long unrelated);
-
-      raise (Exit 0))
+          let globals = bpf_object_find_map_by_name obj "globals" in
+          let lookup_globals idx =
+            bpf_map_lookup_value ~key_ty:Ctypes.int ~val_ty:Ctypes.long
+              ~val_zero:Signed.Long.zero globals idx
+          in
+          (* Print globals at the end *)
+          let total = lookup_globals 1 in
+          let lost = lookup_globals 2 in
+          let unrelated = lookup_globals 3 in
+          let skipped = lookup_globals 4 in
+          let str_of_long clong =
+            Ctypes_value_printing.string_of Ctypes.long clong
+          in
+          Printf.printf
+            "\n\
+             User-space consumed %d events\n\
+             Kernel-space recorded %s total events, %s lost events, %s \
+             unrelated events, %s skipped events\n"
+            !cb (str_of_long total) (str_of_long lost) (str_of_long skipped)
+            (str_of_long unrelated)))
 
 let run ?(tracefile = "trace.fxt") ?(poll_behaviour = Poll 100) ~bpf_object_path
     ~bpf_program_names callback =

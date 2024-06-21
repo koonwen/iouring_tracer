@@ -6,7 +6,7 @@
 
 (library
  (name driver)
- (libraries ocaml_libbpf bindings fxt eio_linux)
+ (libraries ocaml_libbpf ocaml_libbpf_maps bindings fxt eio_linux)
  (modules driver ring_writer))
 
 (rule
