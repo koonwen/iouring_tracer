@@ -40,20 +40,23 @@ The io-uring runtime makes several decisions on how your request
 should be processed asynchronously. In particular, there are 3
 pathways that can happen in the `io_issue_sqe` kernel call:
 
-1. Direct Submission (fast path): If the operation can be started
-   immediately and is likely to complete quickly (and asynchronously),
-   `io_issue_sqe` will directly submit the I/O operation to the device
-   driver or appropriate subsystem. This is done in a way that does
-   not block the submitting process.
+1. Inline completion (fast path): If the IO request can be carried
+   out immediately and does not need to wait, (i.e. the network
+   interface has pending data), `io_issue_sqe` will directly process
+   the request and return the result onto the completion queue.
 
-2. Deferred Execution (slow path): In some cases, operations may not
-   be able to start immediately or require more complex
-   setup. `io_issue_sqe` can queue these operations internally within
-   io_uring or hand them off to other parts of the kernel that will
-   handle them asynchronously. This deferral is crucial for
-   maintaining the non-blocking nature of io_uring. [Goes to the workqueue?]
+2. Poll arming (slow path): For operations that are unable to start
+   immediately but have non-blocking support, `io_issue_sqe` will add
+   them to a poll set (register them for notification when they are
+   ready to be consumed). When they are ready, they are processed and
+   added to the completion ring
 
-3. Arm a poll?
+3. Async worker pool (slow path): For operations that are unable to
+   start immediately and do not have non-blockin support,
+   `io_issue_sqe` adds them to a pool of kernel io-workers that picks
+   up the requests and gets blocked on them until they complete. This
+   allows multiple blocking requests to complete asynchronously by
+   having multiple io-workers handling each one.
 
 This feature allows users to visualize the path a request takes in the
 kernel. The lifetime of a request starts from a submission into the
@@ -81,9 +84,9 @@ information on how to tune your program.
 io-uring internally uses something like a kernel workqueue to run your
 IO request asynchronously. It's not obvious how many workers are
 involved in processing the request and what worker might be blocked
-for a long time. This tool shows each spawned io-worker as a track and the uring
-instance it is associated to. The io-worker display's when it picked up a completion
-for an io operation.
+for a long time. This tool shows each spawned io-worker as a track and
+the uring instance it is associated to. The io-worker display's when
+it picked up a completion for an io operation.
 
 ## Multiple uring instance support
 
@@ -94,24 +97,24 @@ idiomatic way.
 # Current support
 
 - [-] Path of IO request from submission to completion
-  - [ ] Tracepoint visualisation support set
+  - [X] Tracepoint visualisation support set
     - [X] tracepoint:io_uring:io_uring_complete
-    - [ ] tracepoint:io_uring:io_uring_cqe_overflow
+    - [X] tracepoint:io_uring:io_uring_cqe_overflow
     - [X] tracepoint:io_uring:io_uring_cqring_wait
     - [X] tracepoint:io_uring:io_uring_create
-    - [ ] tracepoint:io_uring:io_uring_defer
-    - [ ] tracepoint:io_uring:io_uring_fail_link
-    - [ ] tracepoint:io_uring:io_uring_file_get
-    - [ ] tracepoint:io_uring:io_uring_link
-    - [ ] tracepoint:io_uring:io_uring_local_work_run
-    - [ ] tracepoint:io_uring:io_uring_poll_arm
+    - [X] tracepoint:io_uring:io_uring_defer
+    - [X] tracepoint:io_uring:io_uring_fail_link
+    - [X] tracepoint:io_uring:io_uring_file_get
+    - [X] tracepoint:io_uring:io_uring_link
+    - [X] tracepoint:io_uring:io_uring_local_work_run
+    - [X] tracepoint:io_uring:io_uring_poll_arm
     - [X] tracepoint:io_uring:io_uring_queue_async_work
-    - [ ] tracepoint:io_uring:io_uring_register
-    - [ ] tracepoint:io_uring:io_uring_req_failed
-    - [ ] tracepoint:io_uring:io_uring_short_write
+    - [X] tracepoint:io_uring:io_uring_register
+    - [X] tracepoint:io_uring:io_uring_req_failed
+    - [X] tracepoint:io_uring:io_uring_short_write
     - [X] tracepoint:io_uring:io_uring_submit_sqe
-    - [ ] tracepoint:io_uring:io_uring_task_add
-    - [ ] tracepoint:io_uring:io_uring_task_work_run
+    - [X] tracepoint:io_uring:io_uring_task_add
+    - [X] tracepoint:io_uring:io_uring_task_work_run
     - [X] tracepoint:syscalls:sys_enter_io_uring_enter
     - [X] tracepoint:syscalls:sys_enter_io_uring_register
     - [X] tracepoint:syscalls:sys_enter_io_uring_setup
@@ -144,7 +147,7 @@ idiomatic way.
 # Undesirable Behaviours
 This tool reads events through a shared ring buffer with the kernel. As such
 there is a possibility that events are overwritten before they are read and processed
-when tracing busy workloads. This can result in trace visualizations with missing 
+when tracing busy workloads. This can result in trace visualizations with missing
 events that look strange. To workaround this, the tracing tool has a sampling parameter
 that can be tuned to trace only a percentage of the requests coming in.
 

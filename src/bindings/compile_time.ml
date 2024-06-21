@@ -133,7 +133,7 @@ module Bindings (T : Cstubs_structs.TYPE) = struct
   end
 
   module Struct_io_uring_file_get = struct
-    type t = { ctx : nativeint; req : nativeint; fd : int }
+    type t = { ctx_ptr : nativeint; req_ptr : nativeint; fd : int }
 
     let t = structure "io_uring_file_get"
     let ( -: ) ty label = field t label ty

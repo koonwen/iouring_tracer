@@ -31,6 +31,19 @@ let handle_event (writer : RW.t) _ctx data _size =
       let t = getf event Event.io_uring_create |> B.unload_create in
       Driver.RW.create_event writer ~pid ~ring_fd:t.fd ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_create" ~comm ~ts
+  | B.IO_URING_REGISTER ->
+      let t = getf event Event.io_uring_register |> B.unload_register in
+      W.instant_event writer.fxt ~name:"io_uring_register"
+        ~thread:W.{ pid; tid }
+        ~category:"uring" ~ts
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx));
+            ("opcode", `Int64 (Int64.of_int32 t.opcode));
+            ("nr_files", `Int64 (Int64.of_int32 t.nr_files));
+            ("nr_bufs", `Int64 (Int64.of_int32 t.nr_bufs));
+            ("ret", `Int64 t.ret);
+          ]
   | B.IO_URING_SUBMIT_SQE ->
       let t = getf event Event.io_uring_submit_sqe |> B.unload_submit_sqe in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
@@ -51,7 +64,7 @@ let handle_event (writer : RW.t) _ctx data _size =
         getf event Event.io_uring_queue_async_work |> B.unload_queue_async_work
       in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
-      RW.async_work_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
+      RW.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_queue_async_work" ~comm ~ts ~correlation_id:req_ptr
         ~args:
           [
@@ -60,6 +73,104 @@ let handle_event (writer : RW.t) _ctx data _size =
             ("opcode", `Int64 (Int64.of_int t.opcode));
             ("flags", `Int64 (Int64.of_int32 t.flags));
             ("work_ptr", `Pointer t.work_ptr);
+            ("op_str", `String t.op_str);
+          ]
+  | B.IO_URING_TASK_ADD ->
+      let t = getf event Event.io_uring_task_add |> B.unload_task_add in
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      RW.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
+        ~name:"io_uring_task_add" ~comm ~ts ~correlation_id:req_ptr
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("req", `Pointer req_ptr);
+            ("opcode", `Int64 (Int64.of_int t.opcode));
+            ("mask", `Int64 (Int64.of_int t.mask));
+            ("op_str", `String t.op_str);
+          ]
+  | B.IO_URING_POLL_ARM ->
+      let t = getf event Event.io_uring_poll_arm |> B.unload_poll_arm in
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      RW.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
+        ~name:"io_uring_poll_arm" ~comm ~ts ~correlation_id:req_ptr
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("req", `Pointer req_ptr);
+            ("opcode", `Int64 (Int64.of_int t.opcode));
+            ("mask", `Int64 (Int64.of_int t.mask));
+            ("events", `Int64 (Int64.of_int t.events));
+            ("op_str", `String t.op_str);
+          ]
+  | B.IO_URING_FILE_GET ->
+      let t = getf event Event.io_uring_file_get |> B.unload_file_get in
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      RW.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
+        ~name:"io_uring_file_get" ~comm ~ts ~correlation_id:req_ptr
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("req", `Pointer req_ptr);
+            ("fd", `Int64 (Int64.of_int t.fd));
+          ]
+  | B.IO_URING_DEFER ->
+      let t = getf event Event.io_uring_defer |> B.unload_defer in
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      RW.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid ~name:"io_uring_defer"
+        ~comm ~ts ~correlation_id:req_ptr
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("req", `Pointer (Int64.of_nativeint t.req_ptr));
+            ("opcode", `Int64 (Int64.of_int t.opcode));
+            ("op_str", `String t.op_str);
+          ]
+  | B.IO_URING_FAIL_LINK ->
+      let t = getf event Event.io_uring_fail_link |> B.unload_fail_link in
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      RW.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
+        ~name:"io_uring_fail_link" ~comm ~ts ~correlation_id:req_ptr
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("req", `Pointer (Int64.of_nativeint t.req_ptr));
+            ("link_ptr", `Pointer (Int64.of_nativeint t.link_ptr));
+            ("opcode", `Int64 (Int64.of_int t.opcode));
+            ("op_str", `String t.op_str);
+          ]
+  | B.IO_URING_LINK ->
+      let t = getf event Event.io_uring_link |> B.unload_link in
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      RW.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid ~name:"io_uring_link"
+        ~comm ~ts ~correlation_id:req_ptr
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("req", `Pointer (Int64.of_nativeint t.req_ptr));
+            ("target_req", `Pointer (Int64.of_nativeint t.target_req_ptr));
+          ]
+  | B.IO_URING_REQ_FAILED ->
+      let t = getf event Event.io_uring_req_failed |> B.unload_req_failed in
+      let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      RW.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
+        ~name:"io_uring_req_failed" ~comm ~ts ~correlation_id:req_ptr
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("req", `Pointer (Int64.of_nativeint t.req_ptr));
+            ("opcode", `Int64 (Int64.of_int t.opcode));
+            ("flags", `Int64 (Int64.of_int t.flags));
+            ("ioprio", `Int64 (Int64.of_int t.ioprio));
+            ("off", `Int64 t.off);
+            ("addr", `Pointer t.addr);
+            ("len", `Int64 (Int64.of_int t.len));
+            ("op_flags", `Int64 (Int64.of_int t.op_flags));
+            ("buf_index", `Int64 (Int64.of_int t.buf_index));
+            ("personality", `Int64 (Int64.of_int t.personality));
+            ("file_index", `Int64 (Int64.of_int t.file_index));
+            ("pad1", `Int64 t.pad1);
+            ("addr3", `Pointer t.addr3);
+            ("error", `Int64 (Int64.of_int t.error));
             ("op_str", `String t.op_str);
           ]
   | B.IO_URING_COMPLETE ->
@@ -73,7 +184,58 @@ let handle_event (writer : RW.t) _ctx data _size =
             ("req", `Pointer req_ptr);
             ("res", `Int64 (Int64.of_int t.res));
             ("cflags", `Int64 (Int64.of_int t.cflags));
-                  ]
+          ]
+  | B.IO_URING_SHORT_WRITE ->
+      let t = getf event Event.io_uring_short_write |> B.unload_short_write in
+      W.instant_event writer.fxt ~name:"io_uring_short_write"
+        ~thread:W.{ pid; tid }
+        ~category:"uring" ~ts
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("fpos", `Int64 t.fpos);
+            ("wanted", `Int64 t.wanted);
+            ("got", `Int64 t.got);
+          ]
+  | B.IO_URING_TASK_WORK_RUN ->
+      let t =
+        getf event Event.io_uring_task_work_run |> B.unload_task_work_run
+      in
+      W.instant_event writer.fxt ~name:"io_uring_task_work_run"
+        ~thread:W.{ pid; tid }
+        ~category:"uring" ~ts
+        ~args:
+          [
+            ("tctx", `Pointer (Int64.of_nativeint t.tctx_ptr));
+            ("count", `Int64 (Int64.of_int t.count));
+            ("loops", `Int64 (Int64.of_int t.loops));
+          ]
+  | B.IO_URING_LOCAL_WORK_RUN ->
+      let t =
+        getf event Event.io_uring_local_work_run |> B.unload_local_work_run
+      in
+      W.instant_event writer.fxt ~name:"io_uring_task_work_run"
+        ~thread:W.{ pid; tid }
+        ~category:"uring" ~ts
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("count", `Int64 (Int64.of_int t.count));
+            ("loops", `Int64 (Int64.of_int t.loops));
+          ]
+  | B.IO_URING_CQE_OVERFLOW ->
+      let t = getf event Event.io_uring_cqe_overflow |> B.unload_cqe_overflow in
+      W.instant_event writer.fxt ~name:"io_uring_cqe_overflow"
+        ~thread:W.{ pid; tid }
+        ~category:"uring" ~ts
+        ~args:
+          [
+            ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
+            ("user_data", `Pointer t.user_data);
+            ("res", `Int64 (Int64.of_int t.res));
+            ("cflags", `Int64 (Int64.of_int t.cflags));
+            ("ocqe_ptr", `Pointer (Int64.of_nativeint t.ocqe_ptr));
+          ]
   | B.IO_URING_CQRING_WAIT ->
       let t = getf event Event.io_uring_cqring_wait |> B.unload_cqring_wait in
       W.instant_event writer.fxt ~name:"io_uring_cqring_wait"
@@ -83,8 +245,7 @@ let handle_event (writer : RW.t) _ctx data _size =
           [
             ("ring_ctx", `Pointer (Int64.of_nativeint t.ctx_ptr));
             ("min_events", `Int64 (Int64.of_int t.min_events));
-          ]
-  | _ -> ());
+          ]);
   0
 
 let () =

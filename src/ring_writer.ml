@@ -27,7 +27,7 @@ let get_track_opt t ~pid ~(ring_ctx : ptr) ~tid ~comm =
           let track' = W.{ pid; tid } in
           Hashtbl.add tid_tbl tid track';
 
-          let name = Printf.sprintf "Ring-%d-%s" fd comm in
+          let name = Printf.sprintf "%d-%s" fd comm in
           (* Write to perfetto kernel object metadata *)
           W.kernel_object t.fxt
             ~args:[ ("process", `Koid pid) ]
@@ -75,7 +75,7 @@ let submission_event ?args t ~pid ~ring_ctx ~tid ~name ~comm ~ts ~correlation_id
         ~category:"uring" ~ts;
       W.duration_end t.fxt ?args ~name ~thread:track ~category:"uring" ~ts
 
-let async_work_event ?args t ~pid ~ring_ctx ~tid ~name ~comm ~ts ~correlation_id
+let flow_event ?args t ~pid ~ring_ctx ~tid ~name ~comm ~ts ~correlation_id
     =
   match get_track_opt t ~pid ~ring_ctx ~tid ~comm with
   | None -> ()

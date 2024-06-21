@@ -70,7 +70,7 @@ let unload_file_get (s : Struct_io_uring_file_get.t structure) =
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let fd = getf s fd in
-  { ctx = ctx_ptr; req = req_ptr; fd }
+  { ctx_ptr; req_ptr; fd }
 
 let unload_submit_sqe (s : Struct_io_uring_submit_sqe.t structure) =
   let open Struct_io_uring_submit_sqe in
