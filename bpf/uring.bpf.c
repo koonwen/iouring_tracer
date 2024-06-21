@@ -11,7 +11,7 @@ struct {
 } rb SEC(".maps");
 
 /* Globals implemented as an array */
-/* pid | total | dropped | skipped | unrelated | sampling_idx */
+/* pid | total | lost | skipped | unrelated | sampling_idx */
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __uint(max_entries, 6);
@@ -21,7 +21,7 @@ struct {
 
 int pid_idx = 0;
 int total_idx = 1;
-int dropped_idx = 2;
+int lost_idx = 2;
 int skipped_idx = 3;
 int unrelated_idx = 4;
 int sampling_idx = 5;
@@ -45,7 +45,7 @@ static struct event *__init_event(enum tracepoint_t ty) {
   /* Try to reserve space from BPF ringbuf */
   e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
   if (!e) {
-    __incr_count(&dropped_idx);
+    __incr_count(&lost_idx);
     return NULL;
   }
   id = bpf_get_current_pid_tgid();
@@ -79,10 +79,10 @@ static int __filter_event(int ev_pid, void *req) {
   };
 
   /* Skip if perfect modulups of sampling_value */
-  if (((uintptr_t) req % 10) != 0) {
-    __incr_count(&skipped_idx);
-    return 1;
-  };
+  /* if ((int) r > 0) { */
+  /*   __incr_count(&skipped_idx); */
+  /*   return 1; */
+  /* }; */
 
   return 0;
 }
@@ -138,6 +138,7 @@ int handle_file_get(struct trace_event_raw_io_uring_file_get *ctx) {
   struct event *e;
   struct io_uring_file_get *extra;
 
+  /* bpf_printk("file_get %d", ctx->req); */
   e = __init_event(IO_URING_FILE_GET);
   if (e == NULL)
     return 1;
@@ -158,6 +159,7 @@ int handle_submit_sqe(struct trace_event_raw_io_uring_submit_sqe *ctx) {
   struct io_kiocb *io_kiocb;
   unsigned op_str_off;
 
+  /* bpf_printk("submit %d", ctx->req); */
   e = __init_event(IO_URING_SUBMIT_SQE);
   if (e == NULL)
     return 1;
