@@ -1,16 +1,15 @@
 open Ocaml_libbpf
 module F = C.Functions
 module T = C.Types
-module W = Fxt.Write
 module B = Bindings
-module RW = Ring_writer
+module W = Writer
 
 type poll_behaviour = Poll of int | Busywait
 
 exception Exit of int
 
 let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
-    ~(writer : Ring_writer.t) callback =
+    ~(writer : Writer.t) callback =
   with_bpf_object_open_load_link ~obj_path:bpf_object_path
     ~program_names:bpf_program_names (fun obj _links ->
       (* Set signal handlers *)
@@ -67,7 +66,7 @@ let run ?(tracefile = "trace.fxt") ?(poll_behaviour = Poll 100) ~bpf_object_path
         Eio.Path.open_out ~sw ~create:(`Or_truncate 0o644) output_file
       in
       Eio.Buf_write.with_flow out (fun w ->
-          let writer = Ring_writer.make (W.of_writer w) in
+          let writer = W.make (W.of_writer w) in
           try
             load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names ~writer
               callback

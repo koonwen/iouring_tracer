@@ -1,5 +1,6 @@
 open Ctypes
-include Compile_time.Bindings (Uring_generated)
+include Stubs.Bindings (Uring_generated)
+include Consts
 
 let char_array_as_string a =
   let len = CArray.length a in
@@ -12,52 +13,37 @@ let char_array_as_string a =
     Buffer.contents b
   with Exit -> Buffer.contents b
 
-(* module Skel = struct *)
-(*   open Ocaml_libbpf.Libbpf.Types *)
-(*   type uring_bpf *)
-
-(*   let uring_bpf : uring_bpf structure typ = structure "uring_bpf" *)
-(*   let struct_anon_maps : [`anon] structure typ = structure "" *)
-(*   let ( -: ) ty label = field struct_anon_maps label ty *)
-(*   let rb = ptr bpf_map -: "rb" *)
-(*   let bss = ptr bpf_map -: "bss" *)
-(*   let _ = seal struct_anon_maps *)
-(*   let maps = field uring_bpf "maps" struct_anon_maps *)
-(*   let _ = seal uring_bpf *)
-
-(*   let uring_bpf__destroy = *)
-(*     Foreign.foreign "uring_bpf__destroy" (ptr uring_bpf @-> returning void) *)
-
-(*   let uring_bpf__create_skeleton = *)
-(*     Foreign.foreign "uring_bpf__create_skeleton" *)
-(*       (ptr uring_bpf @-> returning int) *)
-
-(*   let uring_bpf__open_and_load = *)
-(*     Foreign.foreign "uring_bpf__open_and_load" *)
-(*       (void @-> returning (ptr uring_bpf)) *)
-
-(*   let uring_bpf__attach = *)
-(*     Foreign.foreign "uring_bpf__attach" (ptr uring_bpf @-> returning int) *)
-
-(*   let uring_bpf__detach = *)
-(*     Foreign.foreign "uring_bpf__detach" (ptr uring_bpf @-> returning int) *)
-(* end *)
-
 let () =
   assert (Defines.max_op_str_len = max_op_str_len);
   assert (Defines.task_comm_len = task_comm_len)
 
-let unload_create (s : Struct_io_uring_create.t structure) =
-  let open Struct_io_uring_create in
+type io_uring_create = {
+  fd : int;
+  ctx_ptr : nativeint;
+  sq_entries : int32;
+  cq_entries : int32;
+  flags : Consts.Setup_flags.t list;
+}
+
+let unload_create s =
+  let open Create in
   let fd = getf s fd in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let cq_entries = getf s cq_entries |> Unsigned.UInt32.to_int32 in
   let sq_entries = getf s sq_entries |> Unsigned.UInt32.to_int32 in
-  let flags = getf s flags |> Unsigned.UInt32.to_int32 in
+  let flags = getf s flags |> Unsigned.UInt32.to_int64 |> Consts.read in
   { fd; ctx_ptr; sq_entries; cq_entries; flags }
 
-let unload_register (s : Struct_io_uring_register.t structure) =
-  let open Struct_io_uring_register in
+type register = {
+  ctx : nativeint;
+  opcode : int32;
+  nr_files : int32;
+  nr_bufs : int32;
+  ret : int64;
+}
+
+let unload_register s =
+  let open Register in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UInt32.to_int32 in
   let nr_files = getf s nr_files |> Unsigned.UInt32.to_int32 in
@@ -65,15 +51,27 @@ let unload_register (s : Struct_io_uring_register.t structure) =
   let ret = getf s ret in
   { ctx = ctx_ptr; opcode; nr_files; nr_bufs; ret }
 
-let unload_file_get (s : Struct_io_uring_file_get.t structure) =
-  let open Struct_io_uring_file_get in
+type io_uring_file_get = { ctx_ptr : nativeint; req_ptr : nativeint; fd : int }
+
+let unload_file_get s =
+  let open File_get in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let fd = getf s fd in
   { ctx_ptr; req_ptr; fd }
 
-let unload_submit_sqe (s : Struct_io_uring_submit_sqe.t structure) =
-  let open Struct_io_uring_submit_sqe in
+type io_uring_submit_sqe = {
+  ctx_ptr : nativeint;
+  req_ptr : nativeint;
+  opcode : int;
+  flags : int;
+  force_nonblock : bool;
+  sq_thread : bool;
+  op_str : string;
+}
+
+let unload_submit_sqe s =
+  let open Submit_sqe in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -83,8 +81,17 @@ let unload_submit_sqe (s : Struct_io_uring_submit_sqe.t structure) =
   let op_str = getf s op_str |> char_array_as_string in
   { req_ptr; ctx_ptr; opcode; flags; force_nonblock; sq_thread; op_str }
 
-let unload_queue_async_work (s : Struct_io_uring_queue_async_work.t structure) =
-  let open Struct_io_uring_queue_async_work in
+type io_uring_queue_async_work = {
+  ctx_ptr : nativeint;
+  req_ptr : nativeint;
+  opcode : int;
+  flags : int32;
+  work_ptr : int64;
+  op_str : string;
+}
+
+let unload_queue_async_work s =
+  let open Queue_async_work in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -93,8 +100,17 @@ let unload_queue_async_work (s : Struct_io_uring_queue_async_work.t structure) =
   let op_str = getf s op_str |> char_array_as_string in
   { ctx_ptr; req_ptr; opcode; flags; work_ptr; op_str }
 
-let unload_poll_arm (s : Struct_io_uring_poll_arm.t structure) =
-  let open Struct_io_uring_poll_arm in
+type poll_arm = {
+  ctx_ptr : nativeint;
+  req_ptr : nativeint;
+  opcode : int;
+  mask : int;
+  events : int;
+  op_str : string;
+}
+
+let unload_poll_arm s =
+  let open Poll_arm in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -103,8 +119,16 @@ let unload_poll_arm (s : Struct_io_uring_poll_arm.t structure) =
   let op_str = getf s op_str |> char_array_as_string in
   { ctx_ptr; req_ptr; opcode; mask; events; op_str }
 
-let unload_task_add (s : Struct_io_uring_task_add.t structure) =
-  let open Struct_io_uring_task_add in
+type task_add = {
+  ctx_ptr : nativeint;
+  req_ptr : nativeint;
+  opcode : int;
+  mask : int;
+  op_str : string;
+}
+
+let unload_task_add s =
+  let open Task_add in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -112,45 +136,77 @@ let unload_task_add (s : Struct_io_uring_task_add.t structure) =
   let op_str = getf s op_str |> char_array_as_string in
   { ctx_ptr; req_ptr; opcode; mask; op_str }
 
-let unload_task_work_run (s : Struct_io_uring_task_work_run.t structure) =
-  let open Struct_io_uring_task_work_run in
+type task_work_run = { tctx_ptr : nativeint; count : int; loops : int }
+
+let unload_task_work_run s =
+  let open Task_work_run in
   let tctx_ptr = getf s tctx |> raw_address_of_ptr in
   let count = getf s count |> Unsigned.UInt32.to_int in
   let loops = getf s loops |> Unsigned.UInt32.to_int in
   { tctx_ptr; count; loops }
 
-let unload_short_write (s : Struct_io_uring_short_write.t structure) =
-  let open Struct_io_uring_short_write in
+type short_write = {
+  ctx_ptr : nativeint;
+  fpos : int64;
+  wanted : int64;
+  got : int64;
+}
+
+let unload_short_write s =
+  let open Short_write in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let fpos = getf s fpos |> Unsigned.UInt64.to_int64 in
   let wanted = getf s wanted |> Unsigned.UInt64.to_int64 in
   let got = getf s got |> Unsigned.UInt64.to_int64 in
   { ctx_ptr; fpos; wanted; got }
 
-let unload_local_work_run (s : Struct_io_uring_local_work_run.t structure) =
-  let open Struct_io_uring_local_work_run in
+type local_work_run = { ctx_ptr : nativeint; count : int; loops : int }
+
+let unload_local_work_run s =
+  let open Local_work_run in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let count = getf s count in
   let loops = getf s loops |> Unsigned.UInt32.to_int in
   { ctx_ptr; count; loops }
 
-let unload_defer (s : Struct_io_uring_defer.t structure) =
-  let open Struct_io_uring_defer in
+type defer = {
+  ctx_ptr : nativeint;
+  req_ptr : nativeint;
+  opcode : int;
+  op_str : string;
+}
+
+let unload_defer s =
+  let open Defer in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
   let op_str = getf s op_str |> char_array_as_string in
   { ctx_ptr; req_ptr; opcode; op_str }
 
-let unload_link (s : Struct_io_uring_link.t structure) =
-  let open Struct_io_uring_link in
+type link = {
+  ctx_ptr : nativeint;
+  req_ptr : nativeint;
+  target_req_ptr : nativeint;
+}
+
+let unload_link s =
+  let open Link in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let target_req_ptr = getf s target_req |> raw_address_of_ptr in
   { ctx_ptr; req_ptr; target_req_ptr }
 
-let unload_fail_link (s : Struct_io_uring_fail_link.t structure) =
-  let open Struct_io_uring_fail_link in
+type fail_link = {
+  ctx_ptr : nativeint;
+  req_ptr : nativeint;
+  opcode : int;
+  link_ptr : nativeint;
+  op_str : string;
+}
+
+let unload_fail_link s =
+  let open Fail_link in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -158,14 +214,35 @@ let unload_fail_link (s : Struct_io_uring_fail_link.t structure) =
   let op_str = getf s op_str |> char_array_as_string in
   { ctx_ptr; req_ptr; opcode; link_ptr; op_str }
 
-let unload_cqring_wait (s : Struct_io_uring_cqring_wait.t structure) =
-  let open Struct_io_uring_cqring_wait in
+type cqring_wait = { ctx_ptr : nativeint; min_events : int }
+
+let unload_cqring_wait s =
+  let open Cqring_wait in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let min_events = getf s min_events in
   { ctx_ptr; min_events }
 
-let unload_req_failed (s : Struct_io_uring_req_failed.t structure) =
-  let open Struct_io_uring_req_failed in
+type req_failed = {
+  ctx_ptr : nativeint;
+  req_ptr : nativeint;
+  opcode : int;
+  flags : int;
+  ioprio : int;
+  off : int64;
+  addr : int64;
+  len : int;
+  op_flags : int;
+  buf_index : int;
+  personality : int;
+  file_index : int;
+  pad1 : int64;
+  addr3 : int64;
+  error : int;
+  op_str : string;
+}
+
+let unload_req_failed s =
+  let open Req_failed in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -201,8 +278,16 @@ let unload_req_failed (s : Struct_io_uring_req_failed.t structure) =
     op_str;
   }
 
-let unload_cqe_overflow (s : Struct_io_uring_cqe_overflow.t structure) =
-  let open Struct_io_uring_cqe_overflow in
+type cqe_overflow = {
+  ctx_ptr : nativeint;
+  user_data : int64;
+  res : int;
+  cflags : int;
+  ocqe_ptr : nativeint;
+}
+
+let unload_cqe_overflow s =
+  let open Cqe_overflow in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let user_data = getf s user_data |> Unsigned.ULLong.to_int64 in
   let res = getf s res in
@@ -210,8 +295,15 @@ let unload_cqe_overflow (s : Struct_io_uring_cqe_overflow.t structure) =
   let ocqe_ptr = getf s ocqe |> raw_address_of_ptr in
   { ctx_ptr; user_data; res; cflags; ocqe_ptr }
 
-let unload_complete (s : Struct_io_uring_complete.t structure) =
-  let open Struct_io_uring_complete in
+type complete = {
+  req_ptr : nativeint;
+  ctx_ptr : nativeint;
+  res : int;
+  cflags : int;
+}
+
+let unload_complete s =
+  let open Complete in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let res = getf s res in

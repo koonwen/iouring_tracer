@@ -1,59 +1,42 @@
-(library
- (name compile_time)
- (modules compile_time)
- (preprocess
-  (pps ppx_deriving.show))
- (libraries ctypes.stubs))
+; (library
+;  (name bindings)
+;  (modules uring_generated bindings)
+;  (libraries consts ctypes.foreign compile_time ocaml_libbpf))
 
-; Step 1: Compile OCaml generator that has "include" directives for
-; the uring.h & uring.skel.h headers
-
-(executable
- (name stub_gen)
- (modules stub_gen)
- (libraries ctypes.stubs compile_time))
-
-; Step 2: Execute OCaml generator in step 1, producing C generator
+; Generate C stubs executable
 
 (rule
- (targets stub_gen.c)
- (deps stub_gen.exe)
- (action
-  (run %{deps})))
-
-; Step 3: Compile C generator produced in step 2, this step requires
-; the headers to be locatable by the compiler
-
-(rule
- (targets uring.h uring.skel.h)
- (action
-  (progn
-   (copy# ../uring.skel.h uring.skel.h)
-   (copy# %{project_root}/bpf/uring.h uring.h))))
-
-(rule
- (targets stub_gen.out)
- (deps
-  stub_gen.c
-  uring.h ; uring.skel.h
-  )
- (action
-  (bash
-   "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -o %{targets}")))
-
-; Step 4: Execute C generator from Step 3 to produce OCaml type definitions
-
-(rule
- (targets uring_generated.ml)
- (deps stub_gen.out)
+ (target stub_gen.c)
+ (deps %{bin:stub_gen})
  (action
   (with-stdout-to
-   %{targets}
-   (run %{deps} -ml))))
+   %{target}
+   (run stub_gen))))
 
-; Step 5: Add in types dependent on definitions discovered in uring.h & uring.skel.h
+; Compile C stubs executable with uring.h and liburing
+
+(rule
+ (target uring.h)
+ (action
+  (copy# %{project_root}/bpf/uring.h uring.h)))
+
+(rule
+ (target stub_gen.o)
+ (deps uring.h stub_gen.c)
+ (action
+  (bash
+   "%{cc} %{deps} -I `dirname %{lib:ctypes:ctypes_cstubs_internals.h}` -I %{ocaml_where} -luring -o %{target}")))
+
+; Run stub_gen.o
+
+(rule
+ (target uring_generated.ml)
+ (deps stub_gen.o)
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{deps} -ml))))
 
 (library
  (name bindings)
- (modules uring_generated bindings)
- (libraries ctypes.foreign compile_time ocaml_libbpf))
+ (libraries stubs consts))
