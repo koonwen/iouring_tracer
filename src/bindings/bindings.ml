@@ -1,6 +1,6 @@
 open Ctypes
-include Stubs.Bindings (Uring_generated)
-include Consts
+module C = Stubs.Bindings (Uring_generated)
+include Stub_types
 
 let char_array_as_string a =
   let len = CArray.length a in
@@ -13,25 +13,101 @@ let char_array_as_string a =
     Buffer.contents b
   with Exit -> Buffer.contents b
 
+let flags_of_i64 i64 flag_assoc_l =
+  let open Int64 in
+  List.fold_left
+    (fun acc (i, f) -> if logand i64 i <> zero then f :: acc else acc)
+    [] flag_assoc_l
+
+let i64_of_flags flags flag_assoc_l =
+  let open Int64 in
+  List.fold_left (fun acc f -> logor acc (List.assoc f flag_assoc_l)) zero flags
+
+let string_of_flag_list l show =
+  if l = [] then "None" else List.map show l |> String.concat " | "
+
 let () =
-  assert (Defines.max_op_str_len = max_op_str_len);
-  assert (Defines.task_comm_len = task_comm_len)
+  assert (C.(Defines.max_op_str_len = max_op_str_len));
+  assert (C.(Defines.task_comm_len = task_comm_len))
+
+module Setup_flags = struct
+  let setup_flag_assoc =
+    C.Create.Flags.
+      [
+        (IOPOLL, iopoll);
+        (SQPOLL, sqpoll);
+        (SQ_AF, sq_aff);
+        (CLAMP, clamp);
+        (ATTACH_WQ, attach_wq);
+        (R_DISABLED, r_disabled);
+        (SUBMIT_ALL, submit_all);
+        (COOP_TASKRUN, coop_taskrun);
+        (TASKRUN_FLAG, taskrun_flag);
+        (SQE128, sqe128);
+        (CQE32, cqe32);
+        (SINGLE_ISSUER, single_issuer);
+        (DEFER_TASKRUN, defer_taskrun);
+      ]
+
+  let read i64 =
+    flags_of_i64 i64 (List.map (fun (i, f) -> (f, i)) setup_flag_assoc)
+
+  let write flags = i64_of_flags flags setup_flag_assoc
+  let show flags = string_of_flag_list flags show_setup_flags
+end
+
+module Sqe_flags = struct
+  let sqe_flag_assoc =
+    C.Submit_sqe.Flags.
+      [
+        (FIXED_FILE, fixed_file);
+        (IO_DRAIN, io_drain);
+        (IO_LINK, io_link);
+        (IO_HARDLINK, io_hardlink);
+        (ASYNC, async);
+        (BUFFER_SELECT, buffer_select);
+        (CQE_SKIP_SUCCESS, cqe_skip_success);
+      ]
+
+  let read i64 =
+    flags_of_i64 i64 (List.map (fun (i, f) -> (f, i)) sqe_flag_assoc)
+
+  let write flags = i64_of_flags flags sqe_flag_assoc
+  let show flags = string_of_flag_list flags show_sqe_flags
+end
+
+module Cqe_flags = struct
+  let cqe_flag_assoc =
+    C.Complete.Flags.
+      [
+        (BUFFER, buffer);
+        (MORE, more);
+        (SOCK_NONEMPTY, sock_nonempty);
+        (NOTIF, notif);
+      ]
+
+  let read i64 =
+    flags_of_i64 i64 (List.map (fun (i, f) -> (f, i)) cqe_flag_assoc)
+
+  let write flags = i64_of_flags flags cqe_flag_assoc
+  let show flags = string_of_flag_list flags show_cqe_flags
+end
 
 type io_uring_create = {
   fd : int;
   ctx_ptr : nativeint;
   sq_entries : int32;
   cq_entries : int32;
-  flags : Consts.Setup_flags.t list;
+  flags : setup_flags list;
 }
 
 let unload_create s =
-  let open Create in
+  let open C.Create in
   let fd = getf s fd in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let cq_entries = getf s cq_entries |> Unsigned.UInt32.to_int32 in
   let sq_entries = getf s sq_entries |> Unsigned.UInt32.to_int32 in
-  let flags = getf s flags |> Unsigned.UInt32.to_int64 |> Consts.read in
+  let flags = getf s flags |> Unsigned.UInt32.to_int64 |> Setup_flags.read in
   { fd; ctx_ptr; sq_entries; cq_entries; flags }
 
 type register = {
@@ -43,7 +119,7 @@ type register = {
 }
 
 let unload_register s =
-  let open Register in
+  let open C.Register in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UInt32.to_int32 in
   let nr_files = getf s nr_files |> Unsigned.UInt32.to_int32 in
@@ -54,7 +130,7 @@ let unload_register s =
 type io_uring_file_get = { ctx_ptr : nativeint; req_ptr : nativeint; fd : int }
 
 let unload_file_get s =
-  let open File_get in
+  let open C.File_get in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let fd = getf s fd in
@@ -64,18 +140,18 @@ type io_uring_submit_sqe = {
   ctx_ptr : nativeint;
   req_ptr : nativeint;
   opcode : int;
-  flags : int;
+  flags : sqe_flags list;
   force_nonblock : bool;
   sq_thread : bool;
   op_str : string;
 }
 
 let unload_submit_sqe s =
-  let open Submit_sqe in
+  let open C.Submit_sqe in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
-  let flags = getf s flags |> Unsigned.ULong.to_int in
+  let flags = getf s flags |> Unsigned.ULong.to_int64 |> Sqe_flags.read in
   let force_nonblock = getf s force_nonblock in
   let sq_thread = getf s sq_thread in
   let op_str = getf s op_str |> char_array_as_string in
@@ -91,7 +167,7 @@ type io_uring_queue_async_work = {
 }
 
 let unload_queue_async_work s =
-  let open Queue_async_work in
+  let open C.Queue_async_work in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -110,7 +186,7 @@ type poll_arm = {
 }
 
 let unload_poll_arm s =
-  let open Poll_arm in
+  let open C.Poll_arm in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -128,7 +204,7 @@ type task_add = {
 }
 
 let unload_task_add s =
-  let open Task_add in
+  let open C.Task_add in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -139,7 +215,7 @@ let unload_task_add s =
 type task_work_run = { tctx_ptr : nativeint; count : int; loops : int }
 
 let unload_task_work_run s =
-  let open Task_work_run in
+  let open C.Task_work_run in
   let tctx_ptr = getf s tctx |> raw_address_of_ptr in
   let count = getf s count |> Unsigned.UInt32.to_int in
   let loops = getf s loops |> Unsigned.UInt32.to_int in
@@ -153,7 +229,7 @@ type short_write = {
 }
 
 let unload_short_write s =
-  let open Short_write in
+  let open C.Short_write in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let fpos = getf s fpos |> Unsigned.UInt64.to_int64 in
   let wanted = getf s wanted |> Unsigned.UInt64.to_int64 in
@@ -163,7 +239,7 @@ let unload_short_write s =
 type local_work_run = { ctx_ptr : nativeint; count : int; loops : int }
 
 let unload_local_work_run s =
-  let open Local_work_run in
+  let open C.Local_work_run in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let count = getf s count in
   let loops = getf s loops |> Unsigned.UInt32.to_int in
@@ -177,7 +253,7 @@ type defer = {
 }
 
 let unload_defer s =
-  let open Defer in
+  let open C.Defer in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -191,7 +267,7 @@ type link = {
 }
 
 let unload_link s =
-  let open Link in
+  let open C.Link in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let target_req_ptr = getf s target_req |> raw_address_of_ptr in
@@ -206,7 +282,7 @@ type fail_link = {
 }
 
 let unload_fail_link s =
-  let open Fail_link in
+  let open C.Fail_link in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -217,7 +293,7 @@ let unload_fail_link s =
 type cqring_wait = { ctx_ptr : nativeint; min_events : int }
 
 let unload_cqring_wait s =
-  let open Cqring_wait in
+  let open C.Cqring_wait in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let min_events = getf s min_events in
   { ctx_ptr; min_events }
@@ -242,7 +318,7 @@ type req_failed = {
 }
 
 let unload_req_failed s =
-  let open Req_failed in
+  let open C.Req_failed in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let opcode = getf s opcode |> Unsigned.UChar.to_int in
@@ -287,7 +363,7 @@ type cqe_overflow = {
 }
 
 let unload_cqe_overflow s =
-  let open Cqe_overflow in
+  let open C.Cqe_overflow in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let user_data = getf s user_data |> Unsigned.ULLong.to_int64 in
   let res = getf s res in
@@ -299,13 +375,30 @@ type complete = {
   req_ptr : nativeint;
   ctx_ptr : nativeint;
   res : int;
-  cflags : int;
+  cflags : cqe_flags list;
 }
 
 let unload_complete s =
-  let open Complete in
+  let open C.Complete in
   let ctx_ptr = getf s ctx |> raw_address_of_ptr in
   let req_ptr = getf s req |> raw_address_of_ptr in
   let res = getf s res in
-  let cflags = getf s cflags |> Unsigned.UInt.to_int in
+  let cflags = getf s cflags |> Unsigned.UInt.to_int64 |> Cqe_flags.read in
   { ctx_ptr; req_ptr; res; cflags }
+
+type event = {
+  ty : tracepoint_t;
+  pid : int;
+  tid : int;
+  ts : Unsigned.uint64;
+  comm : string;
+}
+
+let unload_event s =
+  let open C.Event in
+  let ty = getf s ty in
+  let pid = getf s pid in
+  let tid = getf s tid in
+  let ts = getf s ts in
+  let comm = getf s comm |> char_array_as_string in
+  { ty; pid; tid; ts; comm }

@@ -8,9 +8,24 @@ type poll_behaviour = Poll of int | Busywait
 
 exception Exit of int
 
-let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
+let pid_idx = 0
+let total_idx = 1
+let lost_idx = 2
+let skipped_idx = 3
+let unrelated_idx = 4
+let sampling_idx = 5
+let user_idx = 6
+
+let init sampling obj =
+  if sampling then
+    let map = bpf_object_find_map_by_name obj "globals" in
+    bpf_map_update_elem map ~key_ty:Ctypes.int ~val_ty:Ctypes.long sampling_idx
+      (Signed.Long.of_int 1)
+
+let load_run ~sampling ~poll_behaviour ~bpf_object_path ~bpf_program_names
     ~(writer : Writer.t) callback =
-  with_bpf_object_open_load_link ~obj_path:bpf_object_path
+  let before_link = init sampling in
+  with_bpf_object_open_load_link ~before_link ~obj_path:bpf_object_path
     ~program_names:bpf_program_names (fun obj _links ->
       (* Set signal handlers *)
       let cont = ref true in
@@ -21,20 +36,18 @@ let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
       let callback_w_ctx = callback writer in
       let map = bpf_object_find_map_by_name obj "rb" in
       Ocaml_libbpf_maps.RingBuffer.init map ~callback:callback_w_ctx (fun rb ->
-          let cb = ref 0 in
-
           (match poll_behaviour with
           | Poll timeout ->
               while !cont do
                 match Ocaml_libbpf_maps.RingBuffer.poll rb ~timeout with
                 (* Ctrl-C will cause -EINTR exception *)
                 | e when e = Sys.sigint -> cont := false
-                | i -> cb := !cb + i
+                | _ -> ()
               done
           | Busywait -> (
               match Ocaml_libbpf_maps.RingBuffer.consume rb with
               | e when e = Sys.sigint -> cont := false
-              | i -> cb := !cb + i));
+              | _ -> ()));
 
           let globals = bpf_object_find_map_by_name obj "globals" in
           let lookup_globals idx =
@@ -44,21 +57,21 @@ let load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names
           (* Print globals at the end *)
           let total = lookup_globals 1 in
           let lost = lookup_globals 2 in
-          let unrelated = lookup_globals 3 in
-          let skipped = lookup_globals 4 in
+          let skipped = lookup_globals 3 in
+          let unrelated = lookup_globals 4 in
+          let user = lookup_globals 6 in
           let str_of_long clong =
             Ctypes_value_printing.string_of Ctypes.long clong
           in
           Printf.printf
             "\n\
-             User-space consumed %d events\n\
-             Kernel-space recorded %s total events, %s lost events, %s \
-             unrelated events, %s skipped events\n"
-            !cb (str_of_long total) (str_of_long lost) (str_of_long skipped)
-            (str_of_long unrelated)))
+             Kernel-space recorded %s total events, %s lost events, %s skipped \
+             events, %s unrelated events, sent to user %s\n"
+            (str_of_long total) (str_of_long lost) (str_of_long skipped)
+            (str_of_long unrelated) (str_of_long user)))
 
-let run ?(tracefile = "trace.fxt") ?(poll_behaviour = Poll 100) ~bpf_object_path
-    ~bpf_program_names callback =
+let run ?(tracefile = "trace.fxt") ?(sampling = true)
+    ?(poll_behaviour = Poll 100) ~bpf_object_path ~bpf_program_names callback =
   Eio_linux.run @@ fun env ->
   Eio.Switch.run (fun sw ->
       let output_file = Eio.Path.( / ) (Eio.Stdenv.cwd env) tracefile in
@@ -68,6 +81,6 @@ let run ?(tracefile = "trace.fxt") ?(poll_behaviour = Poll 100) ~bpf_object_path
       Eio.Buf_write.with_flow out (fun w ->
           let writer = W.make (W.of_writer w) in
           try
-            load_run ~poll_behaviour ~bpf_object_path ~bpf_program_names ~writer
-              callback
+            load_run ~sampling ~poll_behaviour ~bpf_object_path
+              ~bpf_program_names ~writer callback
           with Exit i -> Printf.eprintf "exit %d\n" i))

@@ -1,5 +1,9 @@
 PROJECT_ROOT=..
 
-rings: uring.bpf.o
-	dune build ./trace_uring.exe
+.PHONY=build
+
+build:
+	dune build
+
+rings: build uring.bpf.o
 	sudo $(PROJECT_ROOT)/_build/default/src/trace_uring.exe

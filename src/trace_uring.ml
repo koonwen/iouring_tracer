@@ -1,37 +1,32 @@
 open Driver
 
-(* TODO:
-   - Add better views to flags
-*)
-
 let show_ptr natint =
   let ptr = Ctypes.ptr_of_raw_address natint in
   Ctypes_value_printing.string_of (Ctypes.ptr Ctypes.void) ptr
 
+let cb = ref 0
+
 (* Describe event handler *)
 let handle_event (writer : W.t) _ctx data _size =
   let open Ctypes in
-  let module Event = B.Event in
-  let event = !@(from_voidp Event.t data) in
-  let pid = getf event Event.pid |> Int64.of_int in
-  let tid = getf event Event.tid |> Int64.of_int in
-  let comm = getf event Event.comm |> B.char_array_as_string in
-  let ts = getf event Event.ts |> Unsigned.UInt64.to_int64 in
-  (match getf event Event.ty with
+  incr cb;
+  let event = !@(from_voidp B.C.Event.t data) in
+  let ev = B.unload_event event in
+  let comm = ev.comm in
+  let pid = Int64.of_int ev.pid in
+  let tid = Int64.of_int ev.tid in
+  let ts = Unsigned.UInt64.to_int64 ev.ts in
+  (match ev.ty with
   | ( B.SYS_ENTER_IO_URING_ENTER | B.SYS_ENTER_IO_URING_REGISTER
     | B.SYS_ENTER_IO_URING_SETUP ) as ev ->
-      W.duration_begin writer.fxt ~name:(B.show_tracepoint_t ev)
-        ~thread:W.{ pid; tid }
-        ~category:"syscalls" ~ts
+      W.syscall_begin writer ~name:(B.show_tracepoint_t ev) ~pid ~tid ~ts
   | ( B.SYS_EXIT_IO_URING_ENTER | B.SYS_EXIT_IO_URING_REGISTER
     | B.SYS_EXIT_IO_URING_SETUP ) as ev ->
-      W.duration_end writer.fxt ~name:(B.show_tracepoint_t ev)
-        ~thread:W.{ pid; tid }
-        ~category:"syscalls" ~ts
+      W.syscall_end writer ~name:(B.show_tracepoint_t ev) ~pid ~tid ~ts
   (* Tracepoints *)
   | B.IO_URING_CREATE ->
-      let t = getf event Event.io_uring_create |> B.unload_create in
-      let flag_list_str = t.flags |> B.string_of_flag_list in
+      let t = getf event B.C.Event.io_uring_create |> B.unload_create in
+      let flag_list_str = t.flags |> B.Setup_flags.show in
       W.create_event writer ~pid ~ring_fd:t.fd ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_create" ~comm ~ts
         ~args:
@@ -43,10 +38,8 @@ let handle_event (writer : W.t) _ctx data _size =
             ("flags", `String flag_list_str);
           ]
   | B.IO_URING_REGISTER ->
-      let t = getf event Event.io_uring_register |> B.unload_register in
-      W.instant_event writer.fxt ~name:"io_uring_register"
-        ~thread:W.{ pid; tid }
-        ~category:"uring" ~ts
+      let t = getf event B.C.Event.io_uring_register |> B.unload_register in
+      W.instant_event writer ~name:"io_uring_register" ~pid ~tid ~ts
         ~args:
           [
             ("ring_ptr", `String (show_ptr t.ctx));
@@ -56,8 +49,9 @@ let handle_event (writer : W.t) _ctx data _size =
             ("ret", `Int64 t.ret);
           ]
   | B.IO_URING_SUBMIT_SQE ->
-      let t = getf event Event.io_uring_submit_sqe |> B.unload_submit_sqe in
+      let t = getf event B.C.Event.io_uring_submit_sqe |> B.unload_submit_sqe in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      let flag_list_str = t.flags |> B.Sqe_flags.show in
       W.submission_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_submit" ~comm ~ts ~correlation_id:req_ptr
         ~args:
@@ -66,13 +60,14 @@ let handle_event (writer : W.t) _ctx data _size =
             ("req_ptr", `String (show_ptr t.req_ptr));
             ("op_str", `String t.op_str);
             ("opcode", `Int64 (Int64.of_int t.opcode));
-            ("flags", `String "flagset not implemented");
+            ("flags", `String flag_list_str);
             ("force_nonblock", `String (Bool.to_string t.force_nonblock));
             ("sq_thread", `String (Bool.to_string t.sq_thread));
           ]
   | B.IO_URING_QUEUE_ASYNC_WORK ->
       let t =
-        getf event Event.io_uring_queue_async_work |> B.unload_queue_async_work
+        getf event B.C.Event.io_uring_queue_async_work
+        |> B.unload_queue_async_work
       in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
       W.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
@@ -82,12 +77,12 @@ let handle_event (writer : W.t) _ctx data _size =
             ("ring_ptr", `String (show_ptr t.ctx_ptr));
             ("req_ptr", `String (show_ptr t.req_ptr));
             ("opcode", `Int64 (Int64.of_int t.opcode));
-            ("flags", `String "flagset not implemented");
-            ("work_ptr", `Pointer t.work_ptr);
+            ("flags", `Int64 (Int64.of_int32 t.flags));
+            ("work_ptr", `Int64 t.work_ptr);
             ("op_str", `String t.op_str);
           ]
   | B.IO_URING_TASK_ADD ->
-      let t = getf event Event.io_uring_task_add |> B.unload_task_add in
+      let t = getf event B.C.Event.io_uring_task_add |> B.unload_task_add in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
       W.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_task_add" ~comm ~ts ~correlation_id:req_ptr
@@ -100,7 +95,7 @@ let handle_event (writer : W.t) _ctx data _size =
             ("op_str", `String t.op_str);
           ]
   | B.IO_URING_POLL_ARM ->
-      let t = getf event Event.io_uring_poll_arm |> B.unload_poll_arm in
+      let t = getf event B.C.Event.io_uring_poll_arm |> B.unload_poll_arm in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
       W.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_poll_arm" ~comm ~ts ~correlation_id:req_ptr
@@ -114,7 +109,7 @@ let handle_event (writer : W.t) _ctx data _size =
             ("op_str", `String t.op_str);
           ]
   | B.IO_URING_FILE_GET ->
-      let t = getf event Event.io_uring_file_get |> B.unload_file_get in
+      let t = getf event B.C.Event.io_uring_file_get |> B.unload_file_get in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
       W.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_file_get" ~comm ~ts ~correlation_id:req_ptr
@@ -125,7 +120,7 @@ let handle_event (writer : W.t) _ctx data _size =
             ("fd", `Int64 (Int64.of_int t.fd));
           ]
   | B.IO_URING_DEFER ->
-      let t = getf event Event.io_uring_defer |> B.unload_defer in
+      let t = getf event B.C.Event.io_uring_defer |> B.unload_defer in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
       W.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid ~name:"io_uring_defer"
         ~comm ~ts ~correlation_id:req_ptr
@@ -137,7 +132,7 @@ let handle_event (writer : W.t) _ctx data _size =
             ("op_str", `String t.op_str);
           ]
   | B.IO_URING_FAIL_LINK ->
-      let t = getf event Event.io_uring_fail_link |> B.unload_fail_link in
+      let t = getf event B.C.Event.io_uring_fail_link |> B.unload_fail_link in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
       W.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_fail_link" ~comm ~ts ~correlation_id:req_ptr
@@ -150,7 +145,7 @@ let handle_event (writer : W.t) _ctx data _size =
             ("op_str", `String t.op_str);
           ]
   | B.IO_URING_LINK ->
-      let t = getf event Event.io_uring_link |> B.unload_link in
+      let t = getf event B.C.Event.io_uring_link |> B.unload_link in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
       W.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid ~name:"io_uring_link"
         ~comm ~ts ~correlation_id:req_ptr
@@ -161,7 +156,7 @@ let handle_event (writer : W.t) _ctx data _size =
             ("target_req", `String (show_ptr t.target_req_ptr));
           ]
   | B.IO_URING_REQ_FAILED ->
-      let t = getf event Event.io_uring_req_failed |> B.unload_req_failed in
+      let t = getf event B.C.Event.io_uring_req_failed |> B.unload_req_failed in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
       W.flow_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_req_failed" ~comm ~ts ~correlation_id:req_ptr
@@ -170,7 +165,7 @@ let handle_event (writer : W.t) _ctx data _size =
             ("ring_ptr", `String (show_ptr t.ctx_ptr));
             ("req_ptr", `String (show_ptr t.req_ptr));
             ("opcode", `Int64 (Int64.of_int t.opcode));
-            ("flags", `String "Flagset not implemented");
+            ("flags", `Int64 (Int64.of_int t.flags));
             ("ioprio", `Int64 (Int64.of_int t.ioprio));
             ("off", `Int64 t.off);
             ("addr", `Pointer t.addr);
@@ -185,8 +180,9 @@ let handle_event (writer : W.t) _ctx data _size =
             ("op_str", `String t.op_str);
           ]
   | B.IO_URING_COMPLETE ->
-      let t = getf event Event.io_uring_complete |> B.unload_complete in
+      let t = getf event B.C.Event.io_uring_complete |> B.unload_complete in
       let req_ptr = t.req_ptr |> Int64.of_nativeint in
+      let flag_list_str = t.cflags |> B.Cqe_flags.show in
       W.completion_event writer ~pid ~ring_ctx:t.ctx_ptr ~tid
         ~name:"io_uring_complete" ~comm ~ts ~correlation_id:req_ptr
         ~args:
@@ -194,13 +190,13 @@ let handle_event (writer : W.t) _ctx data _size =
             ("ring_ptr", `String (show_ptr t.ctx_ptr));
             ("req_ptr", `String (show_ptr t.req_ptr));
             ("res", `Int64 (Int64.of_int t.res));
-            ("cflags", `String "flagset not implemneted");
+            ("cflags", `String flag_list_str);
           ]
   | B.IO_URING_SHORT_WRITE ->
-      let t = getf event Event.io_uring_short_write |> B.unload_short_write in
-      W.instant_event writer.fxt ~name:"io_uring_short_write"
-        ~thread:W.{ pid; tid }
-        ~category:"uring" ~ts
+      let t =
+        getf event B.C.Event.io_uring_short_write |> B.unload_short_write
+      in
+      W.instant_event writer ~name:"io_uring_short_write" ~pid ~tid ~ts
         ~args:
           [
             ("ring_ptr", `String (show_ptr t.ctx_ptr));
@@ -210,11 +206,9 @@ let handle_event (writer : W.t) _ctx data _size =
           ]
   | B.IO_URING_TASK_WORK_RUN ->
       let t =
-        getf event Event.io_uring_task_work_run |> B.unload_task_work_run
+        getf event B.C.Event.io_uring_task_work_run |> B.unload_task_work_run
       in
-      W.instant_event writer.fxt ~name:"io_uring_task_work_run"
-        ~thread:W.{ pid; tid }
-        ~category:"uring" ~ts
+      W.instant_event writer ~name:"io_uring_task_work_run" ~pid ~tid ~ts
         ~args:
           [
             ("tctx", `String (show_ptr t.tctx_ptr));
@@ -223,11 +217,9 @@ let handle_event (writer : W.t) _ctx data _size =
           ]
   | B.IO_URING_LOCAL_WORK_RUN ->
       let t =
-        getf event Event.io_uring_local_work_run |> B.unload_local_work_run
+        getf event B.C.Event.io_uring_local_work_run |> B.unload_local_work_run
       in
-      W.instant_event writer.fxt ~name:"io_uring_task_work_run"
-        ~thread:W.{ pid; tid }
-        ~category:"uring" ~ts
+      W.instant_event writer ~name:"io_uring_task_work_run" ~pid ~tid ~ts
         ~args:
           [
             ("ring_ptr", `String (show_ptr t.ctx_ptr));
@@ -235,10 +227,10 @@ let handle_event (writer : W.t) _ctx data _size =
             ("loops", `Int64 (Int64.of_int t.loops));
           ]
   | B.IO_URING_CQE_OVERFLOW ->
-      let t = getf event Event.io_uring_cqe_overflow |> B.unload_cqe_overflow in
-      W.instant_event writer.fxt ~name:"io_uring_cqe_overflow"
-        ~thread:W.{ pid; tid }
-        ~category:"uring" ~ts
+      let t =
+        getf event B.C.Event.io_uring_cqe_overflow |> B.unload_cqe_overflow
+      in
+      W.instant_event writer ~name:"io_uring_cqe_overflow" ~pid ~tid ~ts
         ~args:
           [
             ("ring_ptr", `String (show_ptr t.ctx_ptr));
@@ -248,10 +240,10 @@ let handle_event (writer : W.t) _ctx data _size =
             ("ocqe_ptr", `String (show_ptr t.ocqe_ptr));
           ]
   | B.IO_URING_CQRING_WAIT ->
-      let t = getf event Event.io_uring_cqring_wait |> B.unload_cqring_wait in
-      W.instant_event writer.fxt ~name:"io_uring_cqring_wait"
-        ~thread:W.{ pid; tid }
-        ~category:"uring" ~ts
+      let t =
+        getf event B.C.Event.io_uring_cqring_wait |> B.unload_cqring_wait
+      in
+      W.instant_event writer ~name:"io_uring_cqring_wait" ~pid ~tid ~ts
         ~args:
           [
             ("ring_ptr", `String (show_ptr t.ctx_ptr));
@@ -287,4 +279,5 @@ let () =
         "handle_sys_enter_io_uring_enter";
         "handle_sys_exit_io_uring_enter";
       ]
-    handle_event
+    handle_event;
+  Printf.printf "User space consumed %d events" !cb
